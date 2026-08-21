@@ -3,10 +3,9 @@ telegram_config.json
 gemini_config.json
 .env
 
-# Data & Runtime Files
-bot_daemon.pid
-pending_meals.json
-temp_media/
-__pycache__/
-*.pyc
-.DS_Store
+# Personal Data Privacy: Keep food diary and health profile PRIVATE on Railway!
+food_diary.json
+food_diary.csv
+user_profile.json
+scheduler_state.json
+
