@@ -1,0 +1,12 @@
+# CRITICAL SECURITY: Never commit secrets or raw tokens to GitHub!
+telegram_config.json
+gemini_config.json
+.env
+
+# Data & Runtime Files
+bot_daemon.pid
+pending_meals.json
+temp_media/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,11 @@
+{
+  "weight_kg": 102.0,
+  "height_cm": 180,
+  "age": 46,
+  "gender": "Мужской",
+  "goal": "Снижение веса до 95 кг.",
+  "activity_level": "Умеренная активность",
+  "target_calories": 2448,
+  "target_protein_g": 132,
+  "target_fiber_g": 30
+}
