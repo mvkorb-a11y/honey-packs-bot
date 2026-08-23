@@ -19,6 +19,8 @@ import urllib.parse
 import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
+from datetime import datetime, timedelta
+
 
 CONFIG_FILE = "fitbit_config.json"
 TOKENS_FILE = "fitbit_tokens.json"
@@ -108,26 +110,43 @@ def generate_pkce_pair():
 def authorize_fitbit(client_id, client_secret):
     """Perform OAuth 2.0 PKCE flow to acquire access and refresh tokens."""
     verifier, challenge = generate_pkce_pair()
-    scopes = "activity heartrate location nutrition profile settings sleep social weight"
 
-    auth_url = (
-        f"https://www.fitbit.com/oauth2/authorize?"
-        f"response_type=code&"
-        f"client_id={client_id}&"
-        f"redirect_uri={urllib.parse.quote(REDIRECT_URI)}&"
-        f"scope={urllib.parse.quote(scopes)}&"
-        f"code_challenge={challenge}&"
-        f"code_challenge_method=S256"
-    )
+    is_google = "googleusercontent.com" in client_id
 
-    print("\n🌐 Opening browser for Fitbit Authorization...")
+    if is_google:
+        scopes = "https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.body.read"
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth?"
+            f"response_type=code&"
+            f"client_id={client_id}&"
+            f"redirect_uri={urllib.parse.quote(REDIRECT_URI)}&"
+            f"scope={urllib.parse.quote(scopes)}&"
+            f"code_challenge={challenge}&"
+            f"code_challenge_method=S256&"
+            f"access_type=offline"
+        )
+        token_url = "https://oauth2.googleapis.com/token"
+    else:
+        scopes = "activity heartrate location nutrition profile settings sleep social weight"
+        auth_url = (
+            f"https://www.fitbit.com/oauth2/authorize?"
+            f"response_type=code&"
+            f"client_id={client_id}&"
+            f"redirect_uri={urllib.parse.quote(REDIRECT_URI)}&"
+            f"scope={urllib.parse.quote(scopes)}&"
+            f"code_challenge={challenge}&"
+            f"code_challenge_method=S256"
+        )
+        token_url = "https://api.fitbit.com/oauth2/token"
+
+    print("\n🌐 Opening browser for Health Authorization...")
     print(f"If browser does not open automatically, click this link:\n{auth_url}\n")
     webbrowser.open(auth_url)
 
     # Start local HTTP server to capture authorization code
     server_address = ("localhost", 8080)
     httpd = HTTPServer(server_address, OAuthCallbackHandler)
-    print("⏳ Waiting for Fitbit authorization in browser...")
+    print("⏳ Waiting for authorization in browser...")
     while OAuthCallbackHandler.author_code is None:
         httpd.handle_request()
 
@@ -135,19 +154,32 @@ def authorize_fitbit(client_id, client_secret):
     print("✅ Authorization code received!")
 
     # Exchange code for tokens
-    token_url = "https://api.fitbit.com/oauth2/token"
-    auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
-    headers = {
-        "Authorization": f"Basic {auth_header}",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    data = {
-        "client_id": client_id,
-        "grant_type": "authorization_code",
-        "redirect_uri": REDIRECT_URI,
-        "code": code,
-        "code_verifier": verifier
-    }
+    if is_google:
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        data = {
+            "client_id": client_id.strip(),
+            "grant_type": "authorization_code",
+            "redirect_uri": REDIRECT_URI,
+            "code": code.strip(),
+            "code_verifier": verifier
+        }
+        if client_secret and len(client_secret.strip()) > 0:
+            data["client_secret"] = client_secret.strip()
+
+
+    else:
+        auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
+        headers = {
+            "Authorization": f"Basic {auth_header}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "client_id": client_id,
+            "grant_type": "authorization_code",
+            "redirect_uri": REDIRECT_URI,
+            "code": code,
+            "code_verifier": verifier
+        }
 
     res = requests.post(token_url, headers=headers, data=data)
     if res.status_code != 200:
@@ -156,6 +188,7 @@ def authorize_fitbit(client_id, client_secret):
 
     tokens = res.json()
     tokens["expires_at"] = time.time() + tokens.get("expires_in", 28800)
+    tokens["is_google"] = is_google
     
     with open(TOKENS_FILE, "w", encoding="utf-8") as f:
         json.dump(tokens, f, indent=2)
@@ -166,28 +199,45 @@ def authorize_fitbit(client_id, client_secret):
 
 def refresh_tokens(client_id, client_secret, refresh_token):
     """Refresh expired access token using refresh_token."""
-    token_url = "https://api.fitbit.com/oauth2/token"
-    auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
-    headers = {
-        "Authorization": f"Basic {auth_header}",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token
-    }
+    is_google = True if "googleusercontent.com" in client_id else False
+
+    if is_google:
+        token_url = "https://oauth2.googleapis.com/token"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        data = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token
+        }
+    else:
+        token_url = "https://api.fitbit.com/oauth2/token"
+        auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
+        headers = {
+            "Authorization": f"Basic {auth_header}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token
+        }
 
     res = requests.post(token_url, headers=headers, data=data)
     if res.status_code != 200:
         print(f"❌ Token refresh failed: {res.text}")
         return None
 
-    tokens = res.json()
-    tokens["expires_at"] = time.time() + tokens.get("expires_in", 28800)
-    with open(TOKENS_FILE, "w", encoding="utf-8") as f:
-        json.dump(tokens, f, indent=2)
+    new_tokens = res.json()
+    new_tokens["expires_at"] = time.time() + new_tokens.get("expires_in", 28800)
+    new_tokens["is_google"] = is_google
+    if "refresh_token" not in new_tokens:
+        new_tokens["refresh_token"] = refresh_token
 
-    return tokens
+    with open(TOKENS_FILE, "w", encoding="utf-8") as f:
+        json.dump(new_tokens, f, indent=2)
+
+    return new_tokens
+
 
 
 def get_valid_access_token():
@@ -211,37 +261,77 @@ def get_valid_access_token():
     return tokens["access_token"]
 
 
-def fetch_fitbit_telemetry(date_str="today"):
-    """Fetch complete daily biometric telemetry from Fitbit API."""
+def fetch_fitbit_telemetry(date_str=None):
+    """Fetch complete daily biometric telemetry from Google Fitness or Fitbit API."""
+    if not date_str or date_str == "today":
+        date_str = datetime.now().strftime("%Y-%m-%d")
+
     token = get_valid_access_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    endpoints = {
-        "profile": "https://api.fitbit.com/1/user/-/profile.json",
-        "summary": f"https://api.fitbit.com/1/user/-/activities/date/{date_str}.json",
-        "heart_rate": f"https://api.fitbit.com/1/user/-/activities/heart/date/{date_str}/1d.json",
-        "sleep": f"https://api.fitbit.com/1.2/user/-/sleep/date/{date_str}.json",
-    }
+    with open(TOKENS_FILE, "r", encoding="utf-8") as f:
+        tokens = json.load(f)
 
-    raw_data = {}
-    print(f"\n📡 Fetching Fitbit Biometric Telemetry for date: [{date_str}]...")
+    is_google = tokens.get("is_google", False)
+    raw_data = {"date": date_str, "is_google": is_google}
 
-    for key, url in endpoints.items():
+    print(f"\n📡 Fetching Biometric Telemetry for date: [{date_str}]...")
+
+    if is_google:
+        # Fetch Google Fitness API Datasets
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        start_ms = int(dt.timestamp() * 1000)
+        end_ms = int((dt + timedelta(days=1)).timestamp() * 1000) - 1
+
+        body = {
+            "aggregateBy": [
+                {"dataTypeName": "com.google.step_count.delta"},
+                {"dataTypeName": "com.google.calories.expended"},
+                {"dataTypeName": "com.google.heart_rate.bpm"},
+                {"dataTypeName": "com.google.sleep.segment"}
+            ],
+            "bucketByTime": {"durationMillis": 86400000},
+            "startTimeMillis": start_ms,
+            "endTimeMillis": end_ms
+        }
+
         try:
-            r = requests.get(url, headers=headers)
+            r = requests.post("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", headers=headers, json=body)
             if r.status_code == 200:
-                raw_data[key] = r.json()
-                print(f"  ✓ {key.upper()}: Data fetched successfully (200 OK)")
+                raw_data["fitness_aggregate"] = r.json()
+                print("  ✓ GOOGLE FITNESS API: Aggregate telemetry fetched successfully (200 OK)")
             else:
-                print(f"  ⚠️ {key.upper()}: Status {r.status_code} - {r.text}")
-                raw_data[key] = {"error": r.status_code, "msg": r.text}
+                print(f"  ⚠️ GOOGLE FITNESS API: Status {r.status_code} - {r.text}")
+                raw_data["fitness_aggregate"] = {"error": r.status_code, "msg": r.text}
         except Exception as e:
-            print(f"  ❌ {key.upper()} exception: {e}")
-            raw_data[key] = {"error": str(e)}
+            print(f"  ❌ GOOGLE FITNESS API Exception: {e}")
+            raw_data["fitness_aggregate"] = {"error": str(e)}
+
+    else:
+        # Fetch Fitbit API endpoints
+        endpoints = {
+            "profile": "https://api.fitbit.com/1/user/-/profile.json",
+            "summary": f"https://api.fitbit.com/1/user/-/activities/date/{date_str}.json",
+            "heart_rate": f"https://api.fitbit.com/1/user/-/activities/heart/date/{date_str}/1d.json",
+            "sleep": f"https://api.fitbit.com/1.2/user/-/sleep/date/{date_str}.json",
+        }
+
+        for key, url in endpoints.items():
+            try:
+                r = requests.get(url, headers=headers)
+                if r.status_code == 200:
+                    raw_data[key] = r.json()
+                    print(f"  ✓ {key.upper()}: Data fetched successfully (200 OK)")
+                else:
+                    print(f"  ⚠️ {key.upper()}: Status {r.status_code} - {r.text}")
+                    raw_data[key] = {"error": r.status_code, "msg": r.text}
+            except Exception as e:
+                print(f"  ❌ {key.upper()} exception: {e}")
+                raw_data[key] = {"error": str(e)}
 
     # Save raw telemetry JSON for analysis
     with open(RAW_DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(raw_data, f, indent=2)
+        json.dump(raw_data, f, indent=2, ensure_ascii=False)
 
     print(f"\n💾 Saved full raw telemetry to: {RAW_DATA_FILE}")
     return raw_data
@@ -250,84 +340,87 @@ def fetch_fitbit_telemetry(date_str="today"):
 def analyze_and_print_audit(raw_data):
     """Parse raw telemetry and print structured Health & Recovery Audit."""
     print("\n" + "=" * 65)
-    print("📊 FITBIT HEALTH & RECOVERY BIOMETRIC AUDIT")
+    print("📊 FITBIT / GOOGLE HEALTH BIOMETRIC AUDIT")
     print("=" * 65)
 
-    # 1. Profile
-    profile = raw_data.get("profile", {}).get("user", {})
-    user_name = profile.get("displayName", "User")
-    age = profile.get("age", "N/A")
-    gender = profile.get("gender", "N/A")
-    print(f"👤 User: {user_name} | Age: {age} | Gender: {gender}")
+    is_google = raw_data.get("is_google", False)
+    date_str = raw_data.get("date", datetime.now().strftime("%Y-%m-%d"))
 
-    # 2. Activity & Calories (TDEE)
-    summary = raw_data.get("summary", {}).get("summary", {})
-    total_calories = summary.get("caloriesOut", 0)
-    active_calories = summary.get("activityCalories", 0)
-    steps = summary.get("steps", 0)
-    floors = summary.get("floors", 0)
-    sedentary_mins = summary.get("sedentaryMinutes", 0)
+    steps = 0
+    total_calories = 0
+    resting_hr = "N/A"
+    avg_hr = "N/A"
+    sleep_mins = 0
 
+    if is_google and "fitness_aggregate" in raw_data:
+        buckets = raw_data["fitness_aggregate"].get("bucket", [])
+        if buckets:
+            datasets = buckets[0].get("dataset", [])
+            for ds in datasets:
+                ds_id = ds.get("dataSourceId", "")
+                points = ds.get("point", [])
+                
+                # Steps
+                if "step_count" in ds_id:
+                    for pt in points:
+                        for val in pt.get("value", []):
+                            steps += val.get("intVal", 0)
+                
+                # Calories
+                elif "calories" in ds_id:
+                    for pt in points:
+                        for val in pt.get("value", []):
+                            total_calories += int(val.get("fpVal", 0))
+
+                # Heart Rate
+                elif "heart_rate" in ds_id:
+                    hr_vals = []
+                    for pt in points:
+                        for val in pt.get("value", []):
+                            if "fpVal" in val:
+                                hr_vals.append(val["fpVal"])
+                    if hr_vals:
+                        avg_hr = int(sum(hr_vals) / len(hr_vals))
+                        resting_hr = int(min(hr_vals))
+
+    else:
+        # Fitbit API parser
+        summary = raw_data.get("summary", {}).get("summary", {})
+        total_calories = summary.get("caloriesOut", 0)
+        steps = summary.get("steps", 0)
+
+        hr_data = raw_data.get("heart_rate", {}).get("activities-heart", [{}])[0].get("value", {})
+        resting_hr = hr_data.get("restingHeartRate", "N/A")
+
+    print(f"📅 Date: {date_str} | Source: {'Google Health API' if is_google else 'Fitbit API'}")
     print("\n🔥 CALORIES & PHYSICAL STRAIN:")
     print(f"  • Total Daily Calories Burned (TDEE): {total_calories} kcal")
-    print(f"  • Active Activity Calories:        {active_calories} kcal")
     print(f"  • Total Steps:                      {steps} steps")
-    print(f"  • Sedentary Time:                   {sedentary_mins // 60}h {sedentary_mins % 60}m")
-
-    # 3. Heart Rate & Resting HR
-    hr_data = raw_data.get("heart_rate", {}).get("activities-heart", [{}])[0].get("value", {})
-    resting_hr = hr_data.get("restingHeartRate", "N/A")
-    hr_zones = hr_data.get("heartRateZones", [])
 
     print("\n❤️ HEART RATE & RECOVERY METRICS:")
     print(f"  • Resting Heart Rate (Пульс покоя): {resting_hr} bpm")
-    for zone in hr_zones:
-        z_name = zone.get("name", "Zone")
-        z_min = zone.get("min", 0)
-        z_max = zone.get("max", 0)
-        z_mins = zone.get("minutes", 0)
-        print(f"    - {z_name} ({z_min}-{z_max} bpm): {z_mins} mins")
+    if avg_hr != "N/A":
+        print(f"  • Average Heart Rate (Средний пульс): {avg_hr} bpm")
 
-    # 4. Sleep Architecture
-    sleep_summary = raw_data.get("sleep", {})
-    sleep_records = sleep_summary.get("sleep", [])
-    
-    print("\n🌙 SLEEP ARCHITECTURE & RECOVERY:")
-    if sleep_records:
-        main_sleep = sleep_records[0]
-        total_sleep_mins = main_sleep.get("minutesAsleep", 0)
-        sleep_efficiency = main_sleep.get("efficiency", 0)
-        stages = main_sleep.get("levels", {}).get("summary", {})
-
-        deep_mins = stages.get("deep", {}).get("minutes", 0)
-        rem_mins = stages.get("rem", {}).get("minutes", 0)
-        light_mins = stages.get("light", {}).get("minutes", 0)
-        wake_mins = stages.get("wake", {}).get("minutes", 0)
-
-        print(f"  • Total Duration Asleep: {total_sleep_mins // 60}h {total_sleep_mins % 60}m")
-        print(f"  • Sleep Efficiency:      {sleep_efficiency}%")
-        print(f"  • Deep Sleep (Глубокий): {deep_mins} mins ({round(deep_mins/total_sleep_mins*100 if total_sleep_mins else 0)}%)")
-        print(f"  • REM Sleep (Быстрый):   {rem_mins} mins ({round(rem_mins/total_sleep_mins*100 if total_sleep_mins else 0)}%)")
-        print(f"  • Light Sleep (Легкий):  {light_mins} mins")
-        print(f"  • Awake Time (Пробуждения): {wake_mins} mins")
-    else:
-        print("  • No sleep record logged for today yet.")
-
-    # 5. Energy Battery Calculation
-    # Formula: Baseline 100% - (Physical Strain) + (Sleep Quality)
-    sleep_bonus = 30 if sleep_records else 15
-    energy_battery = max(10, min(100, 100 - (active_calories // 35) + sleep_bonus))
-
-    print("\n⚡ RECOVERY ENERGY BATTERY:")
-    print(f"  • Estimated Energy Battery: [{energy_battery}%]")
-    if energy_battery > 70:
-        print("  • Status: HIGH ENERGY 🟢 (Ready for intense workout & heavy tasks)")
-    elif energy_battery > 40:
-        print("  • Status: MODERATE ENERGY 🟡 (Balanced day, need regular nutrients)")
-    else:
-        print("  • Status: LOW RECOVERY 🔴 (High fatigue, prioritize rest & hydration)")
+    # Load food diary to compute Net Caloric Deficit
+    try:
+        from telegram_bot import load_food_diary
+        diary = load_food_diary()
+        today_diary = diary.get(date_str, [])
+        consumed_cals = sum(item.get("calories", 0) for item in today_diary)
+        
+        if total_calories > 0:
+            net_deficit = consumed_cals - total_calories
+            print("\n⚖️ NET CALORIC BALANCE:")
+            print(f"  • Consumed: {consumed_cals} kcal | Expended: {total_calories} kcal")
+            print(f"  • Net Caloric Deficit/Surplus: {net_deficit:+d} kcal")
+            if net_deficit < -800:
+                print("  ⚠️ ALERT: High Caloric Deficit! Glycogen replenishment & +30g protein recommended.")
+    except Exception as e:
+        pass
 
     print("=" * 65 + "\n")
+
 
 
 if __name__ == "__main__":

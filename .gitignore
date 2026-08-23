@@ -7,5 +7,8 @@ gemini_config.json
 food_diary.json
 food_diary.csv
 user_profile.json
-scheduler_state.json
+fitbit_config.json
+fitbit_tokens.json
+fitbit_raw_data.json
+
 
