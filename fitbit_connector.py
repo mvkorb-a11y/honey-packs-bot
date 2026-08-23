@@ -114,7 +114,9 @@ def authorize_fitbit(client_id, client_secret):
     is_google = "googleusercontent.com" in client_id
 
     if is_google:
-        scopes = "https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.heart_rate.read https://www.googleapis.com/auth/fitness.sleep.read https://www.googleapis.com/auth/fitness.body.read"
+        scopes = "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly https://www.googleapis.com/auth/googlehealth.sleep.readonly https://www.googleapis.com/auth/googlehealth.profile.readonly"
+
+
         auth_url = (
             f"https://accounts.google.com/o/oauth2/v2/auth?"
             f"response_type=code&"
@@ -280,36 +282,45 @@ def fetch_fitbit_telemetry(date_str=None):
     print(f"\n📡 Fetching Biometric Telemetry for date: [{date_str}]...")
 
     if is_google:
-        # Fetch Google Fitness API Datasets
+        # Fetch Google Health API v4 Telemetry
+        headers["Content-Type"] = "application/json"
+        
         dt = datetime.strptime(date_str, "%Y-%m-%d")
-        start_ms = int(dt.timestamp() * 1000)
-        end_ms = int((dt + timedelta(days=1)).timestamp() * 1000) - 1
+        start_iso = dt.strftime("%Y-%m-%dT00:00:00Z")
+        end_iso = (dt + timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
 
         body = {
-            "aggregateBy": [
-                {"dataTypeName": "com.google.step_count.delta"},
-                {"dataTypeName": "com.google.calories.expended"},
-                {"dataTypeName": "com.google.heart_rate.bpm"},
-                {"dataTypeName": "com.google.sleep.segment"}
-            ],
-            "bucketByTime": {"durationMillis": 86400000},
-            "startTimeMillis": start_ms,
-            "endTimeMillis": end_ms
+            "range": {
+                "startTime": start_iso,
+                "endTime": end_iso
+            },
+            "windowSize": "3600s"
         }
 
+        health_data = {}
+        data_types = ["heart-rate", "total-calories", "steps", "active-minutes"]
 
+        for dtype in data_types:
+            url = f"https://health.googleapis.com/v4/users/me/dataTypes/{dtype}/dataPoints:rollUp"
+            try:
+                r = requests.post(url, headers=headers, json=body)
+                if r.status_code == 200:
+                    health_data[dtype] = r.json()
+                    print(f"  ✓ GOOGLE HEALTH API v4 [{dtype}]: Data fetched successfully (200 OK)")
+                else:
+                    print(f"  ⚠️ GOOGLE HEALTH API v4 [{dtype}]: Status {r.status_code}")
+            except Exception as e:
+                print(f"  ❌ [{dtype}] Exception: {e}")
 
+        # Fetch profile
         try:
-            r = requests.post("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", headers=headers, json=body)
-            if r.status_code == 200:
-                raw_data["fitness_aggregate"] = r.json()
-                print("  ✓ GOOGLE FITNESS API: Aggregate telemetry fetched successfully (200 OK)")
-            else:
-                print(f"  ⚠️ GOOGLE FITNESS API: Status {r.status_code} - {r.text}")
-                raw_data["fitness_aggregate"] = {"error": r.status_code, "msg": r.text}
-        except Exception as e:
-            print(f"  ❌ GOOGLE FITNESS API Exception: {e}")
-            raw_data["fitness_aggregate"] = {"error": str(e)}
+            r_prof = requests.get("https://health.googleapis.com/v4/users/me/profile", headers=headers)
+            if r_prof.status_code == 200:
+                health_data["profile"] = r_prof.json()
+        except Exception:
+            pass
+
+        raw_data["google_health_v4"] = health_data
 
     else:
         # Fetch Fitbit API endpoints
@@ -332,6 +343,7 @@ def fetch_fitbit_telemetry(date_str=None):
             except Exception as e:
                 print(f"  ❌ {key.upper()} exception: {e}")
                 raw_data[key] = {"error": str(e)}
+
 
     # Save raw telemetry JSON for analysis
     with open(RAW_DATA_FILE, "w", encoding="utf-8") as f:
@@ -356,36 +368,34 @@ def analyze_and_print_audit(raw_data):
     avg_hr = "N/A"
     sleep_mins = 0
 
-    if is_google and "fitness_aggregate" in raw_data:
-        buckets = raw_data["fitness_aggregate"].get("bucket", [])
-        if buckets:
-            datasets = buckets[0].get("dataset", [])
-            for ds in datasets:
-                ds_id = ds.get("dataSourceId", "")
-                points = ds.get("point", [])
-                
-                # Steps
-                if "step_count" in ds_id:
-                    for pt in points:
-                        for val in pt.get("value", []):
-                            steps += val.get("intVal", 0)
-                
-                # Calories
-                elif "calories" in ds_id:
-                    for pt in points:
-                        for val in pt.get("value", []):
-                            total_calories += int(val.get("fpVal", 0))
+    if is_google and "google_health_v4" in raw_data:
+        gh_data = raw_data["google_health_v4"]
+        
+        # Profile
+        prof = gh_data.get("profile", {})
+        age = prof.get("age", "N/A")
+        print(f"👤 Google Health Profile: Age {age} | Account ID: {prof.get('name', '').split('/')[-2] if '/' in prof.get('name', '') else 'Active'}")
 
-                # Heart Rate
-                elif "heart_rate" in ds_id:
-                    hr_vals = []
-                    for pt in points:
-                        for val in pt.get("value", []):
-                            if "fpVal" in val:
-                                hr_vals.append(val["fpVal"])
-                    if hr_vals:
-                        avg_hr = int(sum(hr_vals) / len(hr_vals))
-                        resting_hr = int(min(hr_vals))
+        # Heart Rate rollups
+        hr_rollups = gh_data.get("heart-rate", {}).get("rollupDataPoints", [])
+        hr_avg_list = []
+        for pt in hr_rollups:
+            hr_info = pt.get("heartRate", {})
+            if "beatsPerMinuteAvg" in hr_info:
+                hr_avg_list.append(hr_info["beatsPerMinuteAvg"])
+        if hr_avg_list:
+            avg_hr = int(sum(hr_avg_list) / len(hr_avg_list))
+            resting_hr = int(min(hr_avg_list))
+
+        # Total Calories
+        cal_rollups = gh_data.get("total-calories", {}).get("rollupDataPoints", [])
+        for pt in cal_rollups:
+            total_calories += int(pt.get("totalCalories", {}).get("kcalSum", 0))
+
+        # Steps
+        step_rollups = gh_data.get("steps", {}).get("rollupDataPoints", [])
+        for pt in step_rollups:
+            steps += int(pt.get("steps", {}).get("countSum", 0))
 
     else:
         # Fitbit API parser
@@ -395,6 +405,7 @@ def analyze_and_print_audit(raw_data):
 
         hr_data = raw_data.get("heart_rate", {}).get("activities-heart", [{}])[0].get("value", {})
         resting_hr = hr_data.get("restingHeartRate", "N/A")
+
 
     print(f"📅 Date: {date_str} | Source: {'Google Health API' if is_google else 'Fitbit API'}")
     print("\n🔥 CALORIES & PHYSICAL STRAIN:")
