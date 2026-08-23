@@ -387,35 +387,59 @@ def analyze_and_print_audit(raw_data):
             avg_hr = int(sum(hr_avg_list) / len(hr_avg_list))
             resting_hr = int(min(hr_avg_list))
 
-        # Total Calories
+        # Total Calories & Active Calories
         cal_rollups = gh_data.get("total-calories", {}).get("rollupDataPoints", [])
         for pt in cal_rollups:
             total_calories += int(pt.get("totalCalories", {}).get("kcalSum", 0))
 
-        # Steps
+        active_cal_rollups = gh_data.get("active-energy-burned", {}).get("rollupDataPoints", [])
+        active_calories = 0
+        for pt in active_cal_rollups:
+            active_calories += int(pt.get("activeEnergyBurned", {}).get("kcalSum", 0))
+
+        # Steps & Distance
         step_rollups = gh_data.get("steps", {}).get("rollupDataPoints", [])
         for pt in step_rollups:
             steps += int(pt.get("steps", {}).get("countSum", 0))
+
+        dist_rollups = gh_data.get("distance", {}).get("rollupDataPoints", [])
+        distance_meters = 0
+        for pt in dist_rollups:
+            distance_meters += int(pt.get("distance", {}).get("millimetersSum", 0)) // 1000
+
+        # Active Minutes
+        active_mins_rollups = gh_data.get("active-minutes", {}).get("rollupDataPoints", [])
+        active_minutes = 0
+        for pt in active_mins_rollups:
+            for lvl in pt.get("activeMinutes", {}).get("activeMinutesRollupByActivityLevel", []):
+                active_minutes += int(lvl.get("activeMinutesSum", 0))
 
     else:
         # Fitbit API parser
         summary = raw_data.get("summary", {}).get("summary", {})
         total_calories = summary.get("caloriesOut", 0)
+        active_calories = summary.get("activityCalories", 0)
         steps = summary.get("steps", 0)
+        distance_meters = summary.get("distances", [{}])[0].get("distance", 0) * 1000
+        active_minutes = summary.get("veryActiveMinutes", 0) + summary.get("fairlyActiveMinutes", 0)
 
         hr_data = raw_data.get("heart_rate", {}).get("activities-heart", [{}])[0].get("value", {})
         resting_hr = hr_data.get("restingHeartRate", "N/A")
 
-
     print(f"📅 Date: {date_str} | Source: {'Google Health API' if is_google else 'Fitbit API'}")
     print("\n🔥 CALORIES & PHYSICAL STRAIN:")
     print(f"  • Total Daily Calories Burned (TDEE): {total_calories} kcal")
-    print(f"  • Total Steps:                      {steps} steps")
+    if 'active_calories' in locals() and active_calories > 0:
+        print(f"  • Active Workout Calories:          {active_calories} kcal")
+    print(f"  • Total Steps:                      {steps} steps ({distance_meters/1000:.2f} km)")
+    if 'active_minutes' in locals() and active_minutes > 0:
+        print(f"  • Active Workout Time:              {active_minutes} mins")
 
     print("\n❤️ HEART RATE & RECOVERY METRICS:")
     print(f"  • Resting Heart Rate (Пульс покоя): {resting_hr} bpm")
     if avg_hr != "N/A":
         print(f"  • Average Heart Rate (Средний пульс): {avg_hr} bpm")
+
 
     # Load food diary to compute Net Caloric Deficit
     try:
