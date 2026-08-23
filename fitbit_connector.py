@@ -123,8 +123,10 @@ def authorize_fitbit(client_id, client_secret):
             f"scope={urllib.parse.quote(scopes)}&"
             f"code_challenge={challenge}&"
             f"code_challenge_method=S256&"
-            f"access_type=offline"
+            f"access_type=offline&"
+            f"prompt=consent"
         )
+
         token_url = "https://oauth2.googleapis.com/token"
     else:
         scopes = "activity heartrate location nutrition profile settings sleep social weight"
@@ -294,6 +296,8 @@ def fetch_fitbit_telemetry(date_str=None):
             "startTimeMillis": start_ms,
             "endTimeMillis": end_ms
         }
+
+
 
         try:
             r = requests.post("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", headers=headers, json=body)
