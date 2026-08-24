@@ -208,7 +208,10 @@ def generate_full_professional_diary(days=14):
     return output
 
 
+build_full_daily_history = generate_full_professional_diary
+
 if __name__ == "__main__":
     out = generate_full_professional_diary(7)
     print("✅ Professional Daily Biometrics & Micronutrient History compiled!")
     print(f"Daily summaries: {len(out['daily_summaries'])}, Individual meals: {len(out['individual_meals'])}")
+

@@ -162,8 +162,9 @@ def get_dashboard_metrics(date_str: str = None):
 
 @app.get("/api/history")
 def get_daily_history(days: int = 7):
-    from daily_biometrics_diary import build_full_daily_history
-    return build_full_daily_history(days)
+    from daily_biometrics_diary import generate_full_professional_diary
+    return generate_full_professional_diary(days)
+
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -444,28 +445,11 @@ def render_dashboard():
 </body>
 </html>"""
     return HTMLResponse(content=html_content)
-                    <td style="padding: 10px;">${m.carbs_g || 0}g</td>
-                            <td style="padding: 10px;">${vm.magnesium_mg || 0}mg</td>
-                            <td style="padding: 10px;">${vm.zinc_mg || 0}mg</td>
-                            <td style="padding: 10px;">${aa.tryptophan_g || 0}g</td>
-                            <td style="padding: 10px; color: var(--accent-blue);">${om.omega3_g || 0}g</td>
-                            <td style="padding: 10px; font-size: 11px; opacity: 0.85;">${m.ai_comment || ''}</td>
-                        </tr>
-                    `}).join('');
-                }
-            } catch (e) {
-                console.error("History update error", e);
-            }
-        }
 
 
-        fetchDashboard();
-        fetchHistory();
-        setInterval(fetchDashboard, 10000);
-    </script>
-</body>
-</html>"""
-    return HTMLResponse(content=html_content)
+if __name__ == "__main__":
+    uvicorn.run("web_dashboard:app", host="0.0.0.0", port=8000, reload=True)
+
 
 
 
