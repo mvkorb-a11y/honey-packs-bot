@@ -160,9 +160,16 @@ def get_dashboard_metrics(date_str: str = None):
 
 
 
+@app.get("/api/history")
+def get_daily_history(days: int = 7):
+    from daily_biometrics_diary import build_full_daily_history
+    return build_full_daily_history(days)
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def render_dashboard():
     html_content = """<!DOCTYPE html>
+
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -299,6 +306,28 @@ def render_dashboard():
                 <!-- Dynamically populated -->
             </tbody>
         </table>
+    <div class="card" style="margin-top: 24px;">
+        <div class="card-title">📅 Профессиональный Дневник Истории (Daily History Journal) <span>ХРОНОЛОГИЯ ПО ДНЯМ</span></div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; font-size: 13px;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted);">
+                    <th style="padding: 10px;">Дата</th>
+                    <th style="padding: 10px;">Еда (ккал)</th>
+                    <th style="padding: 10px;">Белок (г)</th>
+                    <th style="padding: 10px;">Магний (мг)</th>
+                    <th style="padding: 10px;">TDEE (ккал)</th>
+                    <th style="padding: 10px;">Спорт (ккал)</th>
+                    <th style="padding: 10px;">Шаги</th>
+                    <th style="padding: 10px;">Пульс покоя</th>
+                    <th style="padding: 10px;">Физ Батарейка</th>
+                    <th style="padding: 10px;">Strain (0-21)</th>
+                    <th style="padding: 10px;">Дефицит</th>
+                </tr>
+            </thead>
+            <tbody id="history-table-body">
+                <!-- Dynamically populated from /api/history -->
+            </tbody>
+        </table>
     </div>
 
     <script>
@@ -330,12 +359,42 @@ def render_dashboard():
                 console.error("Dashboard update error", e);
             }
         }
+
+        async function fetchHistory() {
+            try {
+                const res = await fetch('/api/history?days=7');
+                const history = await res.json();
+                const tbody = document.getElementById('history-table-body');
+                if (history && tbody) {
+                    tbody.innerHTML = history.map(h => `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 10px; font-weight: 700; color: var(--accent-cyan);">${h.date}</td>
+                            <td style="padding: 10px;">${h.nutrition.consumed_calories_kcal} kcal</td>
+                            <td style="padding: 10px; color: var(--accent-green); font-weight: 600;">${h.nutrition.protein_g}g</td>
+                            <td style="padding: 10px;">${h.nutrition.magnesium_mg}mg</td>
+                            <td style="padding: 10px;">${h.telemetry_fitbit_air.tdee_calories_kcal} kcal</td>
+                            <td style="padding: 10px; color: var(--accent-orange);">${h.telemetry_fitbit_air.active_calories_kcal} kcal</td>
+                            <td style="padding: 10px;">${h.telemetry_fitbit_air.steps_count.toLocaleString()}</td>
+                            <td style="padding: 10px; font-weight: 700; color: #ef4444;">${h.telemetry_fitbit_air.resting_hr_bpm} bpm</td>
+                            <td style="padding: 10px; font-weight: 700; color: var(--accent-green);">${h.biohacking_metrics.physical_battery_pct}%</td>
+                            <td style="padding: 10px; font-weight: 700; color: var(--accent-purple);">${h.biohacking_metrics.strain_score_whoop}</td>
+                            <td style="padding: 10px; font-weight: 700; color: ${h.biohacking_metrics.net_caloric_deficit_kcal < 0 ? '#06b6d4' : '#f97316'};">${h.biohacking_metrics.net_caloric_deficit_kcal} kcal</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error("History update error", e);
+            }
+        }
+
         fetchDashboard();
+        fetchHistory();
         setInterval(fetchDashboard, 10000);
     </script>
 </body>
 </html>"""
     return HTMLResponse(content=html_content)
+
 
 
 
