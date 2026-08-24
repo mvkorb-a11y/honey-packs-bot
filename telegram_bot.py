@@ -840,7 +840,6 @@ def handle_update(token, update):
 
     # Photo logging
     if photo:
-        send_telegram_message(token, chat_id, "Анализирую фото...")
         file_id = photo[-1]["file_id"]
         local_img = download_telegram_file(token, file_id, f"photo_{int(time.time())}.jpg")
         res_data = parse_food_input_deep("Проанализируй фото: еда или вопрос", image_path=local_img)
@@ -849,7 +848,6 @@ def handle_update(token, update):
 
     # Voice logging
     if voice:
-        send_telegram_message(token, chat_id, "Анализирую голосовое сообщение...")
         file_id = voice["file_id"]
         local_voice = download_telegram_file(token, file_id, f"voice_{int(time.time())}.ogg")
         res_data = parse_food_input_deep(
@@ -861,10 +859,10 @@ def handle_update(token, update):
 
     # Text processing
     if text:
-        send_telegram_message(token, chat_id, "Анализирую сообщение...")
         res_data = parse_food_input_deep(text)
         process_result_and_reply(res_data)
         return
+
 
 
 def ensure_single_instance():
