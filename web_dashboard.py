@@ -307,24 +307,51 @@ def render_dashboard():
             </tbody>
         </table>
     <div class="card" style="margin-top: 24px;">
-        <div class="card-title">📅 Профессиональный Дневник Истории (Daily History Journal) <span>ХРОНОЛОГИЯ ПО ДНЯМ</span></div>
+        <div class="card-title">📅 Профессиональный Сводный Дневник (Daily Summaries Journal) <span>ХРОНОЛОГИЯ ПО ДНЯМ</span></div>
         <table style="width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; font-size: 13px;">
             <thead>
                 <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted);">
                     <th style="padding: 10px;">Дата</th>
                     <th style="padding: 10px;">Еда (ккал)</th>
                     <th style="padding: 10px;">Белок (г)</th>
+                    <th style="padding: 10px;">Клетчатка (г)</th>
                     <th style="padding: 10px;">Магний (мг)</th>
+                    <th style="padding: 10px;">Цинк (мг)</th>
+                    <th style="padding: 10px;">Триптофан (г)</th>
+                    <th style="padding: 10px;">Омега-3 (г)</th>
                     <th style="padding: 10px;">TDEE (ккал)</th>
                     <th style="padding: 10px;">Спорт (ккал)</th>
-                    <th style="padding: 10px;">Шаги</th>
                     <th style="padding: 10px;">Пульс покоя</th>
                     <th style="padding: 10px;">Физ Батарейка</th>
-                    <th style="padding: 10px;">Strain (0-21)</th>
                     <th style="padding: 10px;">Дефицит</th>
                 </tr>
             </thead>
             <tbody id="history-table-body">
+                <!-- Dynamically populated from /api/history -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+        <div class="card-title">🍲 Детальный Лог Каждого Приема Пищи (Individual Meal Logs) <span>ПОДЕТАЛЬНЫЙ СПИСОК БЛЮД</span></div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; font-size: 13px;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted);">
+                    <th style="padding: 10px;">Время</th>
+                    <th style="padding: 10px;">Блюдо</th>
+                    <th style="padding: 10px;">Вес (г)</th>
+                    <th style="padding: 10px;">Калории</th>
+                    <th style="padding: 10px;">Белок</th>
+                    <th style="padding: 10px;">Жиры</th>
+                    <th style="padding: 10px;">Углеводы</th>
+                    <th style="padding: 10px;">Магний</th>
+                    <th style="padding: 10px;">Цинк</th>
+                    <th style="padding: 10px;">Триптофан</th>
+                    <th style="padding: 10px;">Омега-3</th>
+                    <th style="padding: 10px;">Комментарий AI</th>
+                </tr>
+            </thead>
+            <tbody id="meals-table-body">
                 <!-- Dynamically populated from /api/history -->
             </tbody>
         </table>
@@ -363,29 +390,63 @@ def render_dashboard():
         async function fetchHistory() {
             try {
                 const res = await fetch('/api/history?days=7');
-                const history = await res.json();
-                const tbody = document.getElementById('history-table-body');
-                if (history && tbody) {
-                    tbody.innerHTML = history.map(h => `
+                const data = await res.json();
+                const dailySummaries = data.daily_summaries || [];
+                const individualMeals = data.individual_meals || [];
+
+                const tbodySummaries = document.getElementById('history-table-body');
+                if (dailySummaries && tbodySummaries) {
+                    tbodySummaries.innerHTML = dailySummaries.map(h => {
+                        const n = h.nutrition_totals || {};
+                        const t = h.telemetry_fitbit_air || {};
+                        const b = h.biohacking_metrics || {};
+                        return `
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
                             <td style="padding: 10px; font-weight: 700; color: var(--accent-cyan);">${h.date}</td>
-                            <td style="padding: 10px;">${h.nutrition.consumed_calories_kcal} kcal</td>
-                            <td style="padding: 10px; color: var(--accent-green); font-weight: 600;">${h.nutrition.protein_g}g</td>
-                            <td style="padding: 10px;">${h.nutrition.magnesium_mg}mg</td>
-                            <td style="padding: 10px;">${h.telemetry_fitbit_air.tdee_calories_kcal} kcal</td>
-                            <td style="padding: 10px; color: var(--accent-orange);">${h.telemetry_fitbit_air.active_calories_kcal} kcal</td>
-                            <td style="padding: 10px;">${h.telemetry_fitbit_air.steps_count.toLocaleString()}</td>
-                            <td style="padding: 10px; font-weight: 700; color: #ef4444;">${h.telemetry_fitbit_air.resting_hr_bpm} bpm</td>
-                            <td style="padding: 10px; font-weight: 700; color: var(--accent-green);">${h.biohacking_metrics.physical_battery_pct}%</td>
-                            <td style="padding: 10px; font-weight: 700; color: var(--accent-purple);">${h.biohacking_metrics.strain_score_whoop}</td>
-                            <td style="padding: 10px; font-weight: 700; color: ${h.biohacking_metrics.net_caloric_deficit_kcal < 0 ? '#06b6d4' : '#f97316'};">${h.biohacking_metrics.net_caloric_deficit_kcal} kcal</td>
+                            <td style="padding: 10px;">${n.calories_kcal} kcal</td>
+                            <td style="padding: 10px; color: var(--accent-green); font-weight: 600;">${n.protein_g}g</td>
+                            <td style="padding: 10px;">${n.fiber_g}g</td>
+                            <td style="padding: 10px;">${n.magnesium_mg}mg</td>
+                            <td style="padding: 10px;">${n.zinc_mg}mg</td>
+                            <td style="padding: 10px;">${n.tryptophan_g}g</td>
+                            <td style="padding: 10px; color: var(--accent-blue);">${n.omega3_g}g</td>
+                            <td style="padding: 10px;">${t.tdee_calories_kcal} kcal</td>
+                            <td style="padding: 10px; color: var(--accent-orange);">${t.active_calories_kcal} kcal</td>
+                            <td style="padding: 10px; font-weight: 700; color: #ef4444;">${t.resting_hr_bpm} bpm</td>
+                            <td style="padding: 10px; font-weight: 700; color: var(--accent-green);">${b.physical_battery_pct}%</td>
+                            <td style="padding: 10px; font-weight: 700; color: ${b.net_caloric_deficit_kcal < 0 ? '#06b6d4' : '#f97316'};">${b.net_caloric_deficit_kcal} kcal</td>
                         </tr>
-                    `).join('');
+                    `}).join('');
+                }
+
+                const tbodyMeals = document.getElementById('meals-table-body');
+                if (individualMeals && tbodyMeals) {
+                    tbodyMeals.innerHTML = individualMeals.map(m => {
+                        const vm = m.vitamins_minerals || {};
+                        const aa = m.amino_acids || {};
+                        const om = m.omega_3_6 || {};
+                        return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 10px; font-weight: 600; color: var(--accent-cyan);">${m.timestamp || ''}</td>
+                            <td style="padding: 10px; font-weight: 700;">${m.meal_name || ''}</td>
+                            <td style="padding: 10px;">${m.estimated_weight_g || 250}g</td>
+                            <td style="padding: 10px; color: var(--accent-orange);">${m.calories || 0} kcal</td>
+                            <td style="padding: 10px; color: var(--accent-green); font-weight: 600;">${m.protein_g || 0}g</td>
+                            <td style="padding: 10px;">${m.fat_g || 0}g</td>
+                            <td style="padding: 10px;">${m.carbs_g || 0}g</td>
+                            <td style="padding: 10px;">${vm.magnesium_mg || 0}mg</td>
+                            <td style="padding: 10px;">${vm.zinc_mg || 0}mg</td>
+                            <td style="padding: 10px;">${aa.tryptophan_g || 0}g</td>
+                            <td style="padding: 10px; color: var(--accent-blue);">${om.omega3_g || 0}g</td>
+                            <td style="padding: 10px; font-size: 11px; opacity: 0.85;">${m.ai_comment || ''}</td>
+                        </tr>
+                    `}).join('');
                 }
             } catch (e) {
                 console.error("History update error", e);
             }
         }
+
 
         fetchDashboard();
         fetchHistory();
