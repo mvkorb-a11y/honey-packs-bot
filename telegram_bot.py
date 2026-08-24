@@ -260,8 +260,20 @@ def handle_callback_query(token, callback_query):
     pending = load_pending_meals()
     draft_info = pending.get(chat_id_str)
 
+    # Handle cancellation of newly logged meal
+    if data.startswith("cancel_logged_meal_"):
+
+        meal_id = data.replace("cancel_logged_meal_", "")
+        from food_nutrition_engine import delete_meal_by_id
+        success = delete_meal_by_id(meal_id)
+        
+        answer_callback_query(token, cb_id, "Запись отменена и удалена")
+        cancel_msg = "🗑️ *ЗАПИСЬ ОТМЕНЕНА И УДАЛЕНА ИЗ ДНЕВНИКАПИТАНИЯ (JSON & CSV)*."
+        edit_telegram_message(token, chat_id, msg_id, cancel_msg)
+
     # Handle confirmation of meal logging
-    if data.startswith("confirm_meal_"):
+    elif data.startswith("confirm_meal_"):
+
         if draft_info:
             meal_data = draft_info["meal_data"]
             commit_meal(meal_data)
@@ -785,6 +797,9 @@ def handle_update(token, update):
             return
 
         if intent == "FOOD_LOG" or "meal_name" in res_data:
+            meal_id = str(uuid.uuid4())[:8]
+            res_data["meal_id"] = meal_id
+            
             # AUTOMATIC IMMEDIATE COMMIT TO JSON AND CSV
             committed = commit_meal(res_data)
             aa = committed.get("amino_acids", {})
@@ -808,7 +823,13 @@ def handle_update(token, update):
                 f"*Комментарий AI*: _{committed.get('ai_comment', '')}_\n\n"
                 f"_Запись сохранена в базу food_diary.json, food_diary.csv и обновлена на Веб-Дашборде._"
             )
-            send_telegram_message(token, chat_id, msg)
+            reply_markup = {
+                "inline_keyboard": [
+                    [{"text": "🗑️ Отменить запись", "callback_data": f"cancel_logged_meal_{meal_id}"}]
+                ]
+            }
+            send_telegram_message(token, chat_id, msg, reply_markup=reply_markup)
+
         elif intent == "QUESTION_OR_CHAT" or "ai_reply" in res_data:
             reply = transcription_header + res_data.get("ai_reply", "Я на связи! Чем могу помочь по вашему рациону или восстановлению?")
             send_telegram_message(token, chat_id, reply)

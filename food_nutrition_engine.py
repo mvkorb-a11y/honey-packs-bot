@@ -566,6 +566,37 @@ def delete_meals_by_indices(indices_list):
     return deleted_count, f"Успешно удалено записей: {deleted_count}. Осталось записей в базе: {len(new_entries)}."
 
 
+def delete_meal_by_id(meal_id):
+    """Delete meal from JSON & CSV diaries by meal_id."""
+    if not meal_id:
+        return False
+    diary = load_food_diary()
+    entries = diary.get("entries", [])
+    new_entries = [e for e in entries if e.get("meal_id") != meal_id]
+    
+    if len(new_entries) == len(entries):
+        return False
+        
+    diary["entries"] = new_entries
+    save_food_diary(diary)
+
+    # Regenerate CSV file completely
+    with open(CSV_FILE, "w", encoding="utf-8-sig") as f:
+        f.write("Дата;Время;Период;Блюдо;Вес (г);Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Сахар (г);Магний (мг);Цинк (мг);Железо (мг);Витамин C (мг)\n")
+        for e in new_entries:
+            append_to_csv_diary(e)
+
+    # Rebuild daily history
+    try:
+        from daily_biometrics_diary import generate_full_professional_diary
+        generate_full_professional_diary(14)
+    except Exception:
+        pass
+
+    return True
+
+
+
 def parse_and_execute_delete_command(text):
     """
     Detect deletion commands like:
