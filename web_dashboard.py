@@ -294,67 +294,11 @@ def render_dashboard():
         <div class="card-title">📊 Таблица Сырых Данных (Raw Telemetry Data Grid) <span>GOOGLE HEALTH API v4</span></div>
         <table style="width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; font-size: 14px;">
             <thead>
-                <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted);">
-                    <th style="padding: 12px;">Метрика</th>
-                    <th style="padding: 12px;">Сырое Значение</th>
-                    <th style="padding: 12px;">Единица</th>
-                    <th style="padding: 12px;">Частота</th>
-                    <th style="padding: 12px;">Источник</th>
-                </tr>
-            </thead>
-            <tbody id="raw-table-body">
-                <!-- Dynamically populated -->
-            </tbody>
-        </table>
-    <div class="card" style="margin-top: 24px;">
-        <div class="card-title">📅 Профессиональный Сводный Дневник (Daily Summaries Journal) <span>ХРОНОЛОГИЯ ПО ДНЯМ</span></div>
-        <table style="width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; font-size: 13px;">
-            <thead>
-                <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted);">
-                    <th style="padding: 10px;">Дата</th>
-                    <th style="padding: 10px;">Еда (ккал)</th>
-                    <th style="padding: 10px;">Белок (г)</th>
-                    <th style="padding: 10px;">Клетчатка (г)</th>
-                    <th style="padding: 10px;">Магний (мг)</th>
-                    <th style="padding: 10px;">Цинк (мг)</th>
-                    <th style="padding: 10px;">Триптофан (г)</th>
-                    <th style="padding: 10px;">Омега-3 (г)</th>
-                    <th style="padding: 10px;">TDEE (ккал)</th>
-                    <th style="padding: 10px;">Спорт (ккал)</th>
-                    <th style="padding: 10px;">Пульс покоя</th>
-                    <th style="padding: 10px;">Физ Батарейка</th>
-                    <th style="padding: 10px;">Дефицит</th>
-                </tr>
-            </thead>
-            <tbody id="history-table-body">
-                <!-- Dynamically populated from /api/history -->
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card" style="margin-top: 24px;">
-        <div class="card-title">🍲 Детальный Лог Каждого Приема Пищи (Individual Meal Logs) <span>ПОДЕТАЛЬНЫЙ СПИСОК БЛЮД</span></div>
-        <table style="width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; font-size: 13px;">
-            <thead>
-                <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted);">
-                    <th style="padding: 10px;">Время</th>
-                    <th style="padding: 10px;">Блюдо</th>
-                    <th style="padding: 10px;">Вес (г)</th>
-                    <th style="padding: 10px;">Калории</th>
-                    <th style="padding: 10px;">Белок</th>
-                    <th style="padding: 10px;">Жиры</th>
-                    <th style="padding: 10px;">Углеводы</th>
-                    <th style="padding: 10px;">Магний</th>
-                    <th style="padding: 10px;">Цинк</th>
-                    <th style="padding: 10px;">Триптофан</th>
-                    <th style="padding: 10px;">Омега-3</th>
-                    <th style="padding: 10px;">Комментарий AI</th>
-                </tr>
-            </thead>
-            <tbody id="meals-table-body">
-                <!-- Dynamically populated from /api/history -->
-            </tbody>
-        </table>
+         <div class="card" style="margin-top: 24px;">
+        <div class="card-title">📅 Профессиональный Дневник Истории (Daily History Accordion) <span>НАЖМИТЕ НА ДЕНЬ, ЧТОБЫ РАСКРЫТЬ ЕДУ</span></div>
+        <div id="history-accordion-container" style="display: flex; flex-direction: column; gap: 14px; margin-top: 16px;">
+            <!-- Dynamically populated Accordion Rows -->
+        </div>
     </div>
 
     <script>
@@ -387,6 +331,20 @@ def render_dashboard():
             }
         }
 
+        function toggleDayDrawer(dateStr) {
+            const drawer = document.getElementById('drawer-' + dateStr);
+            const btn = document.getElementById('btn-' + dateStr);
+            if (drawer) {
+                if (drawer.style.display === 'none' || !drawer.style.display) {
+                    drawer.style.display = 'block';
+                    if (btn) btn.innerText = '🔼 Свернуть';
+                } else {
+                    drawer.style.display = 'none';
+                    if (btn) btn.innerText = '🔽 Развернуть блюда';
+                }
+            }
+        }
+
         async function fetchHistory() {
             try {
                 const res = await fetch('/api/history?days=7');
@@ -394,46 +352,99 @@ def render_dashboard():
                 const dailySummaries = data.daily_summaries || [];
                 const individualMeals = data.individual_meals || [];
 
-                const tbodySummaries = document.getElementById('history-table-body');
-                if (dailySummaries && tbodySummaries) {
-                    tbodySummaries.innerHTML = dailySummaries.map(h => {
+                const container = document.getElementById('history-accordion-container');
+                if (dailySummaries && container) {
+                    container.innerHTML = dailySummaries.map(h => {
                         const n = h.nutrition_totals || {};
                         const t = h.telemetry_fitbit_air || {};
                         const b = h.biohacking_metrics || {};
-                        return `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
-                            <td style="padding: 10px; font-weight: 700; color: var(--accent-cyan);">${h.date}</td>
-                            <td style="padding: 10px;">${n.calories_kcal} kcal</td>
-                            <td style="padding: 10px; color: var(--accent-green); font-weight: 600;">${n.protein_g}g</td>
-                            <td style="padding: 10px;">${n.fiber_g}g</td>
-                            <td style="padding: 10px;">${n.magnesium_mg}mg</td>
-                            <td style="padding: 10px;">${n.zinc_mg}mg</td>
-                            <td style="padding: 10px;">${n.tryptophan_g}g</td>
-                            <td style="padding: 10px; color: var(--accent-blue);">${n.omega3_g}g</td>
-                            <td style="padding: 10px;">${t.tdee_calories_kcal} kcal</td>
-                            <td style="padding: 10px; color: var(--accent-orange);">${t.active_calories_kcal} kcal</td>
-                            <td style="padding: 10px; font-weight: 700; color: #ef4444;">${t.resting_hr_bpm} bpm</td>
-                            <td style="padding: 10px; font-weight: 700; color: var(--accent-green);">${b.physical_battery_pct}%</td>
-                            <td style="padding: 10px; font-weight: 700; color: ${b.net_caloric_deficit_kcal < 0 ? '#06b6d4' : '#f97316'};">${b.net_caloric_deficit_kcal} kcal</td>
-                        </tr>
-                    `}).join('');
-                }
+                        const dayDate = h.date;
 
-                const tbodyMeals = document.getElementById('meals-table-body');
-                if (individualMeals && tbodyMeals) {
-                    tbodyMeals.innerHTML = individualMeals.map(m => {
-                        const vm = m.vitamins_minerals || {};
-                        const aa = m.amino_acids || {};
-                        const om = m.omega_3_6 || {};
+                        // Filter meals for this day
+                        const dayMeals = individualMeals.filter(m => m.timestamp && m.timestamp.startsWith(dayDate));
+
+                        const mealsTableRows = dayMeals.length > 0 ? dayMeals.map(m => {
+                            const vm = m.vitamins_minerals || {};
+                            const aa = m.amino_acids || {};
+                            const om = m.omega_3_6 || {};
+                            return `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 8px; font-weight: 600; color: var(--accent-cyan);">${m.timestamp ? m.timestamp.split(' ')[1] || m.timestamp : ''}</td>
+                                    <td style="padding: 8px; font-weight: 700;">${m.meal_name || ''}</td>
+                                    <td style="padding: 8px;">${m.estimated_weight_g || 250}g</td>
+                                    <td style="padding: 8px; color: var(--accent-orange);">${m.calories || 0} kcal</td>
+                                    <td style="padding: 8px; color: var(--accent-green); font-weight: 600;">${m.protein_g || 0}g</td>
+                                    <td style="padding: 8px;">${m.fat_g || 0}g</td>
+                                    <td style="padding: 8px;">${m.carbs_g || 0}g</td>
+                                    <td style="padding: 8px;">${vm.magnesium_mg || 0}mg</td>
+                                    <td style="padding: 8px;">${vm.zinc_mg || 0}mg</td>
+                                    <td style="padding: 8px;">${aa.tryptophan_g || 0}g</td>
+                                    <td style="padding: 8px; color: var(--accent-blue);">${om.omega3_g || 0}g</td>
+                                    <td style="padding: 8px; font-size: 11px; opacity: 0.85;">${m.ai_comment || ''}</td>
+                                </tr>
+                            `;
+                        }).join('') : `<tr><td colspan="12" style="padding: 12px; color: var(--text-muted); text-align: center;">В этот день приема пищи не было зафиксировано</td></tr>`;
+
                         return `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
-                            <td style="padding: 10px; font-weight: 600; color: var(--accent-cyan);">${m.timestamp || ''}</td>
-                            <td style="padding: 10px; font-weight: 700;">${m.meal_name || ''}</td>
-                            <td style="padding: 10px;">${m.estimated_weight_g || 250}g</td>
-                            <td style="padding: 10px; color: var(--accent-orange);">${m.calories || 0} kcal</td>
-                            <td style="padding: 10px; color: var(--accent-green); font-weight: 600;">${m.protein_g || 0}g</td>
-                            <td style="padding: 10px;">${m.fat_g || 0}g</td>
-                            <td style="padding: 10px;">${m.carbs_g || 0}g</td>
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); border-radius: 16px; padding: 16px; cursor: pointer;" onclick="toggleDayDrawer('${dayDate}')">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <div style="font-size: 18px; font-weight: 800; color: var(--accent-cyan);">${dayDate}</div>
+                                        <div style="background: rgba(16,185,129,0.15); border: 1px solid var(--accent-green); color: var(--accent-green); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700;">${h.meals_count} приёма пищи</div>
+                                    </div>
+                                    <div style="display: flex; gap: 20px; font-size: 14px;">
+                                        <div>🥗 Еда: <b style="color: var(--accent-orange);">${n.calories_kcal || 0} kcal</b> (${n.protein_g || 0}g P | ${n.magnesium_mg || 0}mg Mg)</div>
+                                        <div>⌚ Fitbit TDEE: <b>${t.tdee_calories_kcal || 0} kcal</b> (Спорт: <span style="color: var(--accent-orange);">${t.active_calories_kcal || 0} kcal</span>)</div>
+                                        <div>❤️ Пульс: <b style="color: #ef4444;">${t.resting_hr_bpm || 0} bpm</b></div>
+                                        <div>💪 Физ Батарейка: <b style="color: var(--accent-green);">${b.physical_battery_pct || 0}%</b></div>
+                                    </div>
+                                    <button id="btn-${dayDate}" style="background: rgba(255,255,255,0.08); color: var(--text-main); border: none; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer;">🔽 Развернуть блюда</button>
+                                </div>
+
+                                <!-- Collapsible Drawer -->
+                                <div id="drawer-${dayDate}" style="display: none; margin-top: 16px; border-top: 1px dashed var(--card-border); padding-top: 14px;" onclick="event.stopPropagation()">
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--accent-green); margin-bottom: 8px;">🍲 БЛЮДА И МИКРОНУТРИЕНТЫ ЗА ${dayDate}:</div>
+                                    <div style="overflow-x: auto;">
+                                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+                                            <thead>
+                                                <tr style="color: var(--text-muted); border-bottom: 1px solid var(--card-border);">
+                                                    <th style="padding: 8px;">Время</th>
+                                                    <th style="padding: 8px;">Блюдо</th>
+                                                    <th style="padding: 8px;">Вес</th>
+                                                    <th style="padding: 8px;">Калории</th>
+                                                    <th style="padding: 8px;">Белок</th>
+                                                    <th style="padding: 8px;">Жиры</th>
+                                                    <th style="padding: 8px;">Углеводы</th>
+                                                    <th style="padding: 8px;">Магний</th>
+                                                    <th style="padding: 8px;">Цинк</th>
+                                                    <th style="padding: 8px;">Триптофан</th>
+                                                    <th style="padding: 8px;">Омега-3</th>
+                                                    <th style="padding: 8px;">Комментарий AI</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${mealsTableRows}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error("History update error", e);
+            }
+        }
+
+        fetchDashboard();
+        fetchHistory();
+        setInterval(fetchDashboard, 10000);
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+                    <td style="padding: 10px;">${m.carbs_g || 0}g</td>
                             <td style="padding: 10px;">${vm.magnesium_mg || 0}mg</td>
                             <td style="padding: 10px;">${vm.zinc_mg || 0}mg</td>
                             <td style="padding: 10px;">${aa.tryptophan_g || 0}g</td>
