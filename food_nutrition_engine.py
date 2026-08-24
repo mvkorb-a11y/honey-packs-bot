@@ -70,7 +70,7 @@ def is_food_query(text):
         "грам", "гр", "ккал", "калори", "шейк", "творог", "каша", "овсянк", "салат", "суп",
         "мясо", "рыба", "куриц", "говядин", "овощ", "фрукт", "яблоко", "банан", "яйц", "хлеб",
         "орех", "сметан", "молоко", "протеин", "кофе", "чай", "сок", "мед", "мёд", "масло",
-        "сыр", "макарон", "паста", "рис", "гречк", "авокадо", "чиа", "конопл"
+        "сыр", "макарон", "паста", "рис", "гречк", "авокадо", "чиа", "конопл", "тыкв"
     ]
 
     for kw in food_keywords:
@@ -608,7 +608,7 @@ def parse_and_execute_delete_command(text):
 
 
 def commit_meal(meal_data):
-    """Save a confirmed meal entry into persistent JSON and CSV diaries."""
+    """Save a confirmed meal entry into persistent JSON and CSV diaries, updating daily history."""
     if not meal_data.get("timestamp"):
         meal_data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -616,7 +616,16 @@ def commit_meal(meal_data):
     diary["entries"].append(meal_data)
     save_food_diary(diary)
     append_to_csv_diary(meal_data)
+
+    # Rebuild daily history diary JSON and CSV
+    try:
+        from daily_biometrics_diary import generate_full_professional_diary
+        generate_full_professional_diary(14)
+    except Exception as e:
+        print(f"Error rebuilding daily history: {e}", flush=True)
+
     return meal_data
+
 
 
 def log_meal(text_input, image_path=None):

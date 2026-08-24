@@ -784,16 +784,38 @@ def handle_update(token, update):
             send_daily_stats_summary_only(token, chat_id)
             return
 
-        if intent == "FOOD_LOG":
-            send_meal_confirmation_card(token, chat_id, res_data)
+        if intent == "FOOD_LOG" or "meal_name" in res_data:
+            # AUTOMATIC IMMEDIATE COMMIT TO JSON AND CSV
+            committed = commit_meal(res_data)
+            aa = committed.get("amino_acids", {})
+            vm = committed.get("vitamins_minerals", {})
+            
+            header = ""
+            if committed.get("transcribed_text"):
+                header = f"*Распознано из голоса*: _\"{committed['transcribed_text']}\"_\n\n"
+
+            msg = (
+                f"{header}"
+                f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*!\n\n"
+                f"*Блюдо*: *{committed.get('meal_name', 'Приём пищи')}*\n"
+                f"*Калории*: `{committed.get('calories', 0)} ккал` | Вес: `{committed.get('estimated_weight_g', 250)}г`\n\n"
+                f"*МАКРОНУТРИЕНТЫ*:\n"
+                f"• Белок: `{committed.get('protein_g', 0)}г` | Жиры: `{committed.get('fat_g', 0)}г` | Углеводы: `{committed.get('carbs_g', 0)}г`\n"
+                f"• Клетчатка: `{committed.get('fiber_g', 0)}г` | Сахар: `{committed.get('sugar_g', 0)}г`\n\n"
+                f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
+                f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
+                f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
+                f"*Комментарий AI*: _{committed.get('ai_comment', '')}_\n\n"
+                f"_Запись сохранена в базу food_diary.json, food_diary.csv и обновлена на Веб-Дашборде._"
+            )
+            send_telegram_message(token, chat_id, msg)
         elif intent == "QUESTION_OR_CHAT" or "ai_reply" in res_data:
             reply = transcription_header + res_data.get("ai_reply", "Я на связи! Чем могу помочь по вашему рациону или восстановлению?")
             send_telegram_message(token, chat_id, reply)
-        elif "meal_name" in res_data:
-            send_meal_confirmation_card(token, chat_id, res_data)
         else:
             reply = transcription_header + res_data.get("ai_reply", "Я на связи! Отправьте описание/фото блюда или задайте любой вопрос по питанию.")
             send_telegram_message(token, chat_id, reply)
+
 
     # Photo logging
     if photo:
