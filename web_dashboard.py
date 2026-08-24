@@ -63,13 +63,16 @@ def get_dashboard_metrics(date_str: str = None):
     user_profile = load_json(USER_PROFILE_FILE, {})
     raw_telemetry = load_json(FITBIT_DATA_FILE, {})
 
-    today_food = diary.get(date_str, [])
-    
+    raw_entries = diary.get("entries", []) if isinstance(diary, dict) else (diary if isinstance(diary, list) else [])
+    today_food = [e for e in raw_entries if e.get("timestamp", "").startswith(date_str)]
+
+
     consumed_cals = sum(item.get("calories", 0) for item in today_food)
-    consumed_protein = sum(item.get("protein", 0) for item in today_food)
-    consumed_carbs = sum(item.get("carbs", 0) for item in today_food)
-    consumed_fat = sum(item.get("fat", 0) for item in today_food)
-    consumed_magnesium = sum(item.get("magnesium", 0) for item in today_food)
+    consumed_protein = sum(item.get("protein_g", item.get("protein", 0)) for item in today_food)
+    consumed_carbs = sum(item.get("carbs_g", item.get("carbs", 0)) for item in today_food)
+    consumed_fat = sum(item.get("fat_g", item.get("fat", 0)) for item in today_food)
+    consumed_magnesium = sum(item.get("vitamins_minerals", {}).get("magnesium_mg", item.get("magnesium", 0)) for item in today_food)
+
 
     # Telemetry metrics (from Google Health / Fitbit)
     tdee_calories = 2400  # Baseline TDEE estimate
