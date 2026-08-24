@@ -219,30 +219,39 @@ def format_360_meal_draft(meal):
 
 
 def send_meal_confirmation_card(token, chat_id, meal_data):
-    """Send draft meal card with Telegram Inline confirmation buttons."""
-    draft_id = str(uuid.uuid4())[:8]
+    """Send auto-committed meal card with single cancel/delete inline button."""
+    meal_id = str(uuid.uuid4())[:8]
+    meal_data["meal_id"] = meal_id
+    committed = commit_meal(meal_data)
     
-    pending = load_pending_meals()
-    pending[str(chat_id)] = {
-        "draft_id": draft_id,
-        "meal_data": meal_data
-    }
-    save_pending_meals(pending)
+    aa = committed.get("amino_acids", {})
+    vm = committed.get("vitamins_minerals", {})
+    
+    header = ""
+    if committed.get("transcribed_text"):
+        header = f"*Распознано из голоса*: _\"{committed['transcribed_text']}\"_\n\n"
 
+    msg = (
+        f"{header}"
+        f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*!\n\n"
+        f"*Блюдо*: *{committed.get('meal_name', 'Приём пищи')}*\n"
+        f"*Калории*: `{committed.get('calories', 0)} ккал` | Вес: `{committed.get('estimated_weight_g', 250)}г`\n\n"
+        f"*МАКРОНУТРИЕНТЫ*:\n"
+        f"• Белок: `{committed.get('protein_g', 0)}г` | Жиры: `{committed.get('fat_g', 0)}г` | Углеводы: `{committed.get('carbs_g', 0)}г`\n"
+        f"• Клетчатка: `{committed.get('fiber_g', 0)}г` | Сахар: `{committed.get('sugar_g', 0)}г`\n\n"
+        f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
+        f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
+        f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
+        f"*Комментарий AI*: _{committed.get('ai_comment', '')}_\n\n"
+        f"_Запись сохранена в базу food_diary.json, food_diary.csv и обновлена на Веб-Дашборде._"
+    )
     reply_markup = {
         "inline_keyboard": [
-            [
-                {"text": "✅ Записать в дневник", "callback_data": f"confirm_meal_{draft_id}"},
-                {"text": "❌ Отменить", "callback_data": f"cancel_meal_{draft_id}"}
-            ]
+            [{"text": "🗑️ Отменить запись", "callback_data": f"cancel_logged_meal_{meal_id}"}]
         ]
     }
+    send_telegram_message(token, chat_id, msg, reply_markup=reply_markup)
 
-    msg_text = format_360_meal_draft(meal_data)
-    res = send_telegram_message(token, chat_id, msg_text, reply_markup=reply_markup)
-    if res and res.get("ok"):
-        pending[str(chat_id)]["msg_id"] = res["result"]["message_id"]
-        save_pending_meals(pending)
 
 
 def handle_callback_query(token, callback_query):
