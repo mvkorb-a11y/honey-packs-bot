@@ -320,8 +320,25 @@ def call_gemini_ai_deep(prompt, image_path=None, audio_path=None):
     return None
 
 
+def convert_ogg_to_wav(ogg_path):
+    """Convert Telegram OGG Opus audio file to WAV using ffmpeg if available."""
+    if not os.path.exists(ogg_path):
+        return ogg_path
+    
+    wav_path = ogg_path.rsplit(".", 1)[0] + ".wav"
+    try:
+        cmd = ["ffmpeg", "-y", "-i", ogg_path, "-ar", "16000", "-ac", "1", wav_path]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+        if res.returncode == 0 and os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+            print(f"🎵 [AUDIO CONVERTED TO WAV SUCCESS]: {wav_path}", flush=True)
+            return wav_path
+    except Exception as e:
+        print(f"Notice: ffmpeg conversion skipped ({e}), using raw OGG", flush=True)
+    return ogg_path
+
+
 def transcribe_audio_explicitly(audio_path):
-    """Explicitly transcribe audio file to text via Gemini API with retry logic."""
+    """Explicitly transcribe audio file to text via Gemini API with retry logic and format conversion."""
     api_key = get_gemini_api_key()
     if not api_key or not os.path.exists(audio_path):
         print(f"⚠️ audio_path missing or no api key: {audio_path}", flush=True)
@@ -330,17 +347,21 @@ def transcribe_audio_explicitly(audio_path):
     model_name = get_gemini_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     
-    with open(audio_path, "rb") as f:
+    # Try converting OGG to WAV for higher transcription accuracy
+    target_path = convert_ogg_to_wav(audio_path)
+    mime_type = "audio/wav" if target_path.endswith(".wav") else "audio/ogg"
+
+    with open(target_path, "rb") as f:
         audio_bytes = f.read()
         audio_data = base64.b64encode(audio_bytes).decode("utf-8")
         
-    print(f"🎤 [TRANSCRIBING AUDIO]: {audio_path} ({len(audio_bytes)} bytes)...", flush=True)
+    print(f"🎤 [TRANSCRIBING AUDIO]: {target_path} ({len(audio_bytes)} bytes, MIME: {mime_type})...", flush=True)
     
     payload = {
         "contents": [{
             "parts": [
-                {"text": "Transcribe the spoken Russian speech in this audio file accurately. Output ONLY the raw transcribed text string in Russian."},
-                {"inline_data": {"mime_type": "audio/ogg", "data": audio_data}}
+                {"text": "Дословно распознай русскую речь из этого аудиофайла. Выведи ТОЛЬКО расшифрованный текст на русском языке без лишних знаков и вводных слов."},
+                {"inline_data": {"mime_type": mime_type, "data": audio_data}}
             ]
         }]
     }
@@ -355,8 +376,9 @@ def transcribe_audio_explicitly(audio_path):
                     parts = candidates[0]["content"].get("parts", [])
                     if parts and "text" in parts[0]:
                         trans_text = parts[0]["text"].strip()
-                        print(f"🎙️ [AUDIO TRANSCRIBED SUCCESS]: \"{trans_text}\"", flush=True)
-                        return trans_text
+                        if trans_text:
+                            print(f"🎙️ [AUDIO TRANSCRIBED SUCCESS]: \"{trans_text}\"", flush=True)
+                            return trans_text
             else:
                 print(f"⚠️ Transcribe API error Status {r.status_code}: {r.text[:150]}", flush=True)
         except Exception as e:
@@ -366,6 +388,7 @@ def transcribe_audio_explicitly(audio_path):
     return ""
 
 
+
 def parse_food_input_deep(text_or_dict, image_path=None, audio_path=None):
     """Process user input via Gemini Deep AI (Text, Vision, or Audio) with robust 2-step audio pipeline."""
     text_input = text_or_dict if isinstance(text_or_dict, str) else text_or_dict.get("text", "")
@@ -373,18 +396,20 @@ def parse_food_input_deep(text_or_dict, image_path=None, audio_path=None):
     transcribed_text = ""
     if audio_path and os.path.exists(audio_path):
         transcribed_text = transcribe_audio_explicitly(audio_path)
-        if transcribed_text:
-            text_input = transcribed_text
+        if not transcribed_text:
+            return {
+                "intent": "AUDIO_ERROR",
+                "error_message": "🎙️ Не удалось четко распознать голосовое сообщение. Пожалуйста, надиктуйте блюдо еще раз близко к микрофону."
+            }
+        text_input = transcribed_text
 
     prompt = text_input
-    if audio_path and not prompt:
-        prompt = "Аудиозапись пользователя. Послушай её, определи намерение (FOOD_LOG или QUESTION_OR_CHAT) и ответь строго по схеме."
-
-    ai_result = call_gemini_ai_deep(prompt, image_path=image_path, audio_path=audio_path)
+    ai_result = call_gemini_ai_deep(prompt, image_path=image_path, audio_path=audio_path if not transcribed_text else None)
     if ai_result:
         if transcribed_text and not ai_result.get("transcribed_text"):
             ai_result["transcribed_text"] = transcribed_text
         return ai_result
+
 
     # Intent-aware Fallback (never create fake meal entries on API error!)
     if is_food_query(text_input) or image_path:

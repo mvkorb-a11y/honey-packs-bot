@@ -789,7 +789,12 @@ def handle_update(token, update):
             send_daily_stats_summary_only(token, chat_id)
             return
 
+        if intent == "AUDIO_ERROR":
+            send_telegram_message(token, chat_id, res_data.get("error_message", "🎙️ Не удалось разобрать голосовую аудиозапись."))
+            return
+
         if intent == "FOOD_LOG" or "meal_name" in res_data:
+
             meal_id = str(uuid.uuid4())[:8]
             res_data["meal_id"] = meal_id
             
