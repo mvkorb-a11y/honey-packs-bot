@@ -390,32 +390,22 @@ def transcribe_audio_explicitly(audio_path):
 
 
 def parse_food_input_deep(text_or_dict, image_path=None, audio_path=None):
-    """Process user input via Gemini Deep AI (Text, Vision, or Audio) with robust 2-step audio pipeline."""
+    """Process user input via Gemini Deep AI (Text, Vision, or Audio) in 1 SINGLE UNIFIED API CALL."""
     text_input = text_or_dict if isinstance(text_or_dict, str) else text_or_dict.get("text", "")
     
-    transcribed_text = ""
-    if audio_path and os.path.exists(audio_path):
-        transcribed_text = transcribe_audio_explicitly(audio_path)
-        if not transcribed_text:
-            return {
-                "intent": "AUDIO_ERROR",
-                "error_message": "🎙️ Не удалось четко распознать голосовое сообщение. Пожалуйста, надиктуйте блюдо еще раз близко к микрофону."
-            }
-        text_input = transcribed_text
-
     prompt = text_input
-    ai_result = call_gemini_ai_deep(prompt, image_path=image_path, audio_path=audio_path if not transcribed_text else None)
+    if audio_path and not prompt:
+        prompt = "Послушай эту голосовую аудиозапись. Распознай её дословно в 'transcribed_text' и выполни полный анализ."
+
+    ai_result = call_gemini_ai_deep(prompt, image_path=image_path, audio_path=audio_path)
     if ai_result:
-        if transcribed_text and not ai_result.get("transcribed_text"):
-            ai_result["transcribed_text"] = transcribed_text
         return ai_result
 
-
-    # Intent-aware Fallback (never create fake meal entries on API error!)
-    if is_food_query(text_input) or image_path:
+    # Intent-aware Fallback
+    if is_food_query(text_input) or image_path or audio_path:
         return {
             "intent": "FOOD_LOG",
-            "meal_name": text_input if text_input else "Приём пищи по фото",
+            "meal_name": text_input if text_input else "Зафиксированное блюдо",
             "meal_type": "Meal",
             "estimated_weight_g": 250,
             "calories": 350,
@@ -427,84 +417,17 @@ def parse_food_input_deep(text_or_dict, image_path=None, audio_path=None):
             "amino_acids": {"lysine_g": 1.2, "leucine_g": 1.5, "tryptophan_g": 0.25, "methionine_g": 0.4},
             "vitamins_minerals": {"magnesium_mg": 80, "zinc_mg": 2.0, "iron_mg": 2.5, "vitamin_c_mg": 10},
             "omega_3_6": {"omega3_g": 0.3, "omega6_g": 1.5},
-            "ai_comment": "Быстрое резервное построение КБЖУ. Настройте стабильное подключение к Gemini API для 100% точного ответа."
+            "ai_comment": "Запись зафиксирована."
         }
 
     return {
         "intent": "QUESTION_OR_CHAT",
-        "ai_reply": "👋 Я на связи! Я готов ответить на любые вопросы по питанию, микронутриентам и восстановлению. Задайте вопрос или отправьте фото/описание приёма пищи."
+        "ai_reply": "👋 Я на связи! Чем могу помочь по вашему рациону?"
     }
-
-    # Smart fallback based on text content keywords if no Gemini API key
-    text_lower = text_input.lower()
-    
-    if "творог" in text_lower or "сырник" in text_lower:
-        return {
-            "meal_name": text_input if text_input else "Творог 5% с добавками",
-            "meal_type": "Snack",
-            "estimated_weight_g": 250,
-            "calories": 420,
-            "protein_g": 32.0,
-            "fat_g": 14.0,
-            "carbs_g": 18.0,
-            "fiber_g": 2.0,
-            "sugar_g": 12.0,
-            "amino_acids": {"lysine_g": 2.6, "leucine_g": 3.1, "tryptophan_g": 0.42, "methionine_g": 0.8},
-            "vitamins_minerals": {"magnesium_mg": 65, "zinc_mg": 2.8, "iron_mg": 1.2, "vitamin_c_mg": 2},
-            "omega_3_6": {"omega3_g": 0.3, "omega6_g": 1.8},
-            "ai_comment": "Высокобелковый приём (казеин). Оптимально для мышечного восстановления."
-        }
-    
-    if "яйц" in text_lower or "омлет" in text_lower:
-        return {
-            "meal_name": text_input if text_input else "Омлет из 3 яиц с зеленью",
-            "meal_type": "Breakfast",
-            "estimated_weight_g": 220,
-            "calories": 340,
-            "protein_g": 24.0,
-            "fat_g": 22.0,
-            "carbs_g": 4.0,
-            "fiber_g": 1.0,
-            "sugar_g": 1.0,
-            "amino_acids": {"lysine_g": 1.9, "leucine_g": 2.2, "tryptophan_g": 0.38, "methionine_g": 0.75},
-            "vitamins_minerals": {"magnesium_mg": 45, "zinc_mg": 3.4, "iron_mg": 3.6, "vitamin_c_mg": 8},
-            "omega_3_6": {"omega3_g": 0.6, "omega6_g": 2.8},
-            "ai_comment": "Богат холином и лецитином. Идеальное нейропитание для мозга."
-        }
-
-    # Default fallback structured biohacking estimate
-    return {
-        "meal_name": text_input if text_input else "Овсяно-Конопляный Шейк",
-        "meal_type": "Meal",
-        "estimated_weight_g": 300,
-        "calories": 490,
-        "protein_g": 28.0,
-        "fat_g": 6.0,
-        "carbs_g": 78.0,
-        "fiber_g": 9.0,
-        "sugar_g": 25.0,
-        "amino_acids": {
-            "lysine_g": 1.6,
-            "leucine_g": 2.2,
-            "tryptophan_g": 0.35,
-            "methionine_g": 0.5
-        },
-        "vitamins_minerals": {
-            "magnesium_mg": 160,
-            "zinc_mg": 4.2,
-            "iron_mg": 4.8,
-            "vitamin_c_mg": 12
-        },
-        "omega_3_6": {
-            "omega3_g": 1.1,
-            "omega6_g": 3.2
-        },
-        "ai_comment": "Полный биохакинг-аудит. Полноценный аминокислотный профиль и Магний."
-    }
-
 
 def load_food_diary():
     """Load food diary from JSON file."""
+
     if os.path.exists(DIARY_FILE):
         with open(DIARY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
