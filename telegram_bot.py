@@ -280,29 +280,13 @@ def handle_callback_query(token, callback_query):
         cancel_msg = "🗑️ *ЗАПИСЬ ОТМЕНЕНА И УДАЛЕНА ИЗ ДНЕВНИКАПИТАНИЯ (JSON & CSV)*."
         edit_telegram_message(token, chat_id, msg_id, cancel_msg)
 
-    # Handle confirmation of meal logging
-    elif data.startswith("confirm_meal_"):
-
-        if draft_info:
-            meal_data = draft_info["meal_data"]
-            commit_meal(meal_data)
-            pending.pop(chat_id_str, None)
-            save_pending_meals(pending)
-
-            answer_callback_query(token, cb_id, "Дневник питания обновлен.")
-            send_telegram_message(token, chat_id, "Дневник питания обновлен.")
-        else:
-            answer_callback_query(token, cb_id, "Запись уже обработана")
-            send_telegram_message(token, chat_id, "Дневник питания обновлен.")
-
-    # Handle cancellation of meal logging (DELETE CARD MESSAGE FROM CHAT)
-    elif data.startswith("cancel_meal_"):
+    # Handle legacy button clicks on old messages in chat history
+    elif data.startswith("confirm_meal_") or data.startswith("cancel_meal_"):
         pending.pop(chat_id_str, None)
         save_pending_meals(pending)
-        answer_callback_query(token, cb_id, "Запись отменена")
-        
-        # Erase card message from Telegram chat screen completely
+        answer_callback_query(token, cb_id, "Эта кнопка устарела. Все блюда теперь записываются автоматически.")
         delete_telegram_message(token, chat_id, msg_id)
+
 
     # Handle Model Switching
     elif data.startswith("set_model_"):
