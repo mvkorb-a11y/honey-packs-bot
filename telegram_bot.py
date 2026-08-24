@@ -201,7 +201,7 @@ def format_360_meal_draft(meal):
 
     msg = (
         f"{header}"
-        f"*ПРЕДВАРИТЕЛЬНОЕ РАСПОЗНАВАНИЕ БЛЮДА*\n\n"
+        f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*\n\n"
         f"*Название*: *{meal['meal_name']}*\n"
         f"*Период дня*: `{meal_type_ru}`\n"
         f"*Оценочный вес*: `{meal.get('estimated_weight_g', 250)}г`\n"
@@ -212,10 +212,10 @@ def format_360_meal_draft(meal):
         f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
         f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
         f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
-        f"*Комментарий AI*: _{meal['ai_comment']}_\n\n"
-        f"*Записать блюдо в дневник?*"
+        f"*Комментарий AI*: _{meal['ai_comment']}_"
     )
     return msg
+
 
 
 def send_meal_confirmation_card(token, chat_id, meal_data):
