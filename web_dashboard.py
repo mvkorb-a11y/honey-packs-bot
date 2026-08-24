@@ -440,7 +440,10 @@ def render_dashboard():
 
         fetchDashboard();
         fetchHistory();
-        setInterval(fetchDashboard, 10000);
+        setInterval(() => {
+            fetchDashboard();
+            fetchHistory();
+        }, 5000);
     </script>
 </body>
 </html>"""
@@ -449,6 +452,7 @@ def render_dashboard():
 
 if __name__ == "__main__":
     uvicorn.run("web_dashboard:app", host="0.0.0.0", port=8000, reload=True)
+
 
 
 
