@@ -178,8 +178,18 @@ def parse_raw_food_input(text_or_dict, image_path=None, audio_path=None):
     return None
 
 
-def commit_raw_meal(meal_data):
-    """Save raw meal entry into food_diary.json & food_diary.csv."""
+def commit_raw_meal(meal_data, source="LIBRARY"):
+    """
+    Save meal entry into food_diary.json & food_diary.csv under Strict Write Authorization Rule.
+    Authorized sources: 'LIBRARY' (my_custom_recipes.json), 'ANALYTICS_ENGINE' (Tier 2), 'APP' (App UI).
+    """
+    authorized_sources = ["LIBRARY", "ANALYTICS_ENGINE", "APP"]
+    is_custom_matched = meal_data.get("source") == "LIBRARY" or meal_data.get("is_custom_matched") is True
+    
+    if source not in authorized_sources and not is_custom_matched:
+        print(f"⚠️ [WRITE REJECTED]: Unverified write source '{source}'. Entries must originate from LIBRARY, ANALYTICS_ENGINE or APP.", flush=True)
+        return None
+
     diary = {"entries": []}
     if os.path.exists(DIARY_FILE):
         try:
@@ -202,6 +212,7 @@ def commit_raw_meal(meal_data):
         "fiber_g": meal_data.get("fiber_g", 0),
         "sugar_g": meal_data.get("sugar_g", 0),
         "transcribed_text": meal_data.get("transcribed_text", ""),
+        "source": "LIBRARY" if is_custom_matched else source,
         "amino_acids": meal_data.get("amino_acids", {}),
         "vitamins_minerals": meal_data.get("vitamins_minerals", {}),
         "omega_3_6": meal_data.get("omega_3_6", {})
@@ -215,12 +226,14 @@ def commit_raw_meal(meal_data):
     file_exists = os.path.exists(DIARY_CSV_FILE)
     with open(DIARY_CSV_FILE, "a", encoding="utf-8-sig") as f:
         if not file_exists:
-            f.write("Дата и время;ID;Название блюда;Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Магний (мг);Цинк (мг);Железо (мг);Витамин C (мг);Витамин D (мкг);Витамин B12 (мкг);Калий (мг);Кальций (мг);Лизин (г);Триптофан (г)\n")
+            f.write("Дата и время;ID;Источник;Название блюда;Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Магний (мг);Цинк (мг);Железо (мг);Витамин C (мг);Витамин D (мкг);Витамин B12 (мкг);Калий (мг);Кальций (мг);Лизин (г);Триптофан (г)\n")
         
         vm = meal_entry.get("vitamins_minerals", {})
         aa = meal_entry.get("amino_acids", {})
-        line = f"{meal_entry['timestamp']};{meal_entry['id']};{meal_entry['meal_name']};{meal_entry['calories']};{meal_entry['protein_g']};{meal_entry['fat_g']};{meal_entry['carbs_g']};{meal_entry['fiber_g']};{vm.get('magnesium_mg', 0)};{vm.get('zinc_mg', 0)};{vm.get('iron_mg', 0)};{vm.get('vitamin_c_mg', 0)};{vm.get('vitamin_d_mcg', 0)};{vm.get('vitamin_b12_mcg', 0)};{vm.get('potassium_mg', 0)};{vm.get('calcium_mg', 0)};{aa.get('lysine_g', 0)};{aa.get('tryptophan_g', 0)}\n"
+        line = f"{meal_entry['timestamp']};{meal_entry['id']};{meal_entry['source']};{meal_entry['meal_name']};{meal_entry['calories']};{meal_entry['protein_g']};{meal_entry['fat_g']};{meal_entry['carbs_g']};{meal_entry['fiber_g']};{vm.get('magnesium_mg', 0)};{vm.get('zinc_mg', 0)};{vm.get('iron_mg', 0)};{vm.get('vitamin_c_mg', 0)};{vm.get('vitamin_d_mcg', 0)};{vm.get('vitamin_b12_mcg', 0)};{vm.get('potassium_mg', 0)};{vm.get('calcium_mg', 0)};{aa.get('lysine_g', 0)};{aa.get('tryptophan_g', 0)}\n"
         f.write(line)
 
+    print(f"✅ [AUTHORIZED WRITE SUCCESS] Source: {meal_entry['source']} | Dish: {meal_entry['meal_name']}", flush=True)
     return meal_entry
+
 
