@@ -764,13 +764,22 @@ def handle_update(token, update):
             send_telegram_message(token, chat_id, del_msg_v)
             return
 
-        # Check if user spoke a request for 7-day or 30-day period reports
-        if any(kw in transcription for kw in ["месяц", "30 дн", "тридцать дн", "за месяц", "дела за месяц"]):
+        # Check if user requested a Monthly Report ("месяц", "отчет за месяц", "30 дней")
+        month_keywords = ["месяц", "30 дн", "тридцать дн", "за месяц", "дела за месяц", "отчет за месяц", "месячный отчет", "отчет месяц"]
+        if any(kw in transcription for kw in month_keywords):
             send_period_report(token, chat_id, 30)
             return
 
-        if any(kw in transcription for kw in ["недел", "7 дн", "семь дн", "за неделю", "дела за неделю"]):
+        # Check if user requested a Weekly Report ("неделя", "отчет за неделю", "7 дней")
+        week_keywords = ["неделя", "недел", "7 дн", "семь дн", "за неделю", "дела за неделю", "отчет за неделю", "недельный отчет", "отчет неделя"]
+        if any(kw in transcription for kw in week_keywords):
             send_period_report(token, chat_id, 7)
+            return
+
+        # Check if user requested a Daily Report or General Report ("день", "отчет за день", "итоги дня", "отчет", "отчёт")
+        day_keywords = ["день", "сегодня", "итоги дня", "отчет за день", "дневной отчет", "отчет день", "итоги", "отчет", "отчёт", "данные", "статистика", "баланс", "выдай все данные", "покажи дневник"]
+        if any(kw in transcription for kw in day_keywords):
+            send_daily_stats_summary_only(token, chat_id)
             return
 
         # Explicit request for food/meals list ONLY ("что я съел", "какую еду я ел", "покажи блюда")
@@ -782,14 +791,6 @@ def handle_update(token, update):
             send_itemized_meals_only(token, chat_id)
             return
 
-        # Stats / Summary / Data requests ("итоги дня", "выдай все данные", "данные за день", "отчет")
-        stats_keywords = [
-            "итоги", "отчет", "данные", "статистика", "баланс", "выдай все данные",
-            "выдай данные", "э данные", "данные за день", "покажи дневник", "дневник за сегодня"
-        ]
-        if any(kw in transcription for kw in stats_keywords):
-            send_daily_stats_summary_only(token, chat_id)
-            return
 
         if intent == "AUDIO_ERROR":
             send_telegram_message(token, chat_id, res_data.get("error_message", "🎙️ Не удалось разобрать голосовую аудиозапись."))
