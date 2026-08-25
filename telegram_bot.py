@@ -839,12 +839,14 @@ def handle_update(token, update):
             }
             send_telegram_message(token, chat_id, msg, reply_markup=reply_markup)
 
-        elif intent == "QUESTION_OR_CHAT" or "ai_reply" in res_data:
-            reply = transcription_header + res_data.get("ai_reply", "Я на связи! Чем могу помочь по вашему рациону или восстановлению?")
-            send_telegram_message(token, chat_id, reply)
         else:
-            reply = transcription_header + res_data.get("ai_reply", "Я на связи! Отправьте описание/фото блюда или задайте любой вопрос по питанию.")
+            reply = (
+                f"{transcription_header}"
+                f"🎙️ *Еда не распознана*.\n\n"
+                f"Назовите блюдо (например: _\"Творог 200г\"_) или запросите отчёт словами: *день*, *неделя*, *месяц*."
+            )
             send_telegram_message(token, chat_id, reply)
+
 
 
     # Photo logging

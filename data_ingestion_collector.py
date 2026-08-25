@@ -117,9 +117,9 @@ def parse_raw_food_input(text_or_dict, image_path=None, audio_path=None):
 
 
     system_instruction = (
-        "You are a fast FoodTech data ingestion parser.\n"
+        "You are a strict FoodTech Data Ingestion Parser (Tier 1 Ingestion Only).\n"
         "FOR AUDIO VOICE NOTES: Transcribe spoken audio text word-for-word into Russian in 'transcribed_text'.\n"
-        "Respond ONLY with a JSON object in one of two schemas:\n\n"
+        "DO NOT write conversational replies, advice, commentary, or greetings. Output ONLY JSON.\n\n"
         "SCHEMA 1 (FOOD_LOG):\n"
         "{\n"
         '  "intent": "FOOD_LOG",\n'
@@ -137,13 +137,13 @@ def parse_raw_food_input(text_or_dict, image_path=None, audio_path=None):
         '  "vitamins_minerals": {"magnesium_mg": 75, "zinc_mg": 2.5, "iron_mg": 2.2, "vitamin_c_mg": 10, "vitamin_d_mcg": 1.5, "vitamin_b12_mcg": 0.8, "potassium_mg": 350, "calcium_mg": 120},\n'
         '  "omega_3_6": {"omega3_g": 0.4, "omega6_g": 1.2}\n'
         "}\n\n"
-        "SCHEMA 2 (QUESTION_OR_CHAT):\n"
+        "SCHEMA 2 (NON_FOOD_INPUT):\n"
         "{\n"
         '  "intent": "QUESTION_OR_CHAT",\n'
-        '  "transcribed_text": "Word-for-word speech transcription",\n'
-        '  "ai_reply": "Friendly response in Russian"\n'
+        '  "transcribed_text": "Word-for-word speech transcription"\n'
         "}"
     )
+
 
     parts = [{"text": f"{system_instruction}\n\nUser Input: {prompt}"}]
 
