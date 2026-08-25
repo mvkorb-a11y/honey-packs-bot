@@ -97,9 +97,8 @@ def parse_raw_food_input(text_or_dict, image_path=None, audio_path=None):
         '  "fiber_g": 4.0,\n'
         '  "sugar_g": 8.0,\n'
         '  "amino_acids": {"lysine_g": 1.4, "leucine_g": 1.8, "tryptophan_g": 0.3, "methionine_g": 0.5},\n'
-        '  "vitamins_minerals": {"magnesium_mg": 75, "zinc_mg": 2.5, "iron_mg": 2.2, "vitamin_c_mg": 10},\n'
-        '  "omega_3_6": {"omega3_g": 0.4, "omega6_g": 1.2},\n'
-        '  "ai_comment": "Быстрая фиксация в базе данных."\n'
+        '  "vitamins_minerals": {"magnesium_mg": 75, "zinc_mg": 2.5, "iron_mg": 2.2, "vitamin_c_mg": 10, "vitamin_d_mcg": 1.5, "vitamin_b12_mcg": 0.8, "potassium_mg": 350, "calcium_mg": 120},\n'
+        '  "omega_3_6": {"omega3_g": 0.4, "omega6_g": 1.2}\n'
         "}\n\n"
         "SCHEMA 2 (QUESTION_OR_CHAT):\n"
         "{\n"
@@ -171,8 +170,7 @@ def commit_raw_meal(meal_data):
         "transcribed_text": meal_data.get("transcribed_text", ""),
         "amino_acids": meal_data.get("amino_acids", {}),
         "vitamins_minerals": meal_data.get("vitamins_minerals", {}),
-        "omega_3_6": meal_data.get("omega_3_6", {}),
-        "ai_comment": meal_data.get("ai_comment", "")
+        "omega_3_6": meal_data.get("omega_3_6", {})
     }
 
     diary.setdefault("entries", []).append(meal_entry)
@@ -183,11 +181,12 @@ def commit_raw_meal(meal_data):
     file_exists = os.path.exists(DIARY_CSV_FILE)
     with open(DIARY_CSV_FILE, "a", encoding="utf-8-sig") as f:
         if not file_exists:
-            f.write("Дата и время;ID;Название блюда;Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Магний (мг);Цинк (мг);Лизин (г);Триптофан (г)\n")
+            f.write("Дата и время;ID;Название блюда;Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Магний (мг);Цинк (мг);Железо (мг);Витамин C (мг);Витамин D (мкг);Витамин B12 (мкг);Калий (мг);Кальций (мг);Лизин (г);Триптофан (г)\n")
         
         vm = meal_entry.get("vitamins_minerals", {})
         aa = meal_entry.get("amino_acids", {})
-        line = f"{meal_entry['timestamp']};{meal_entry['id']};{meal_entry['meal_name']};{meal_entry['calories']};{meal_entry['protein_g']};{meal_entry['fat_g']};{meal_entry['carbs_g']};{meal_entry['fiber_g']};{vm.get('magnesium_mg', 0)};{vm.get('zinc_mg', 0)};{aa.get('lysine_g', 0)};{aa.get('tryptophan_g', 0)}\n"
+        line = f"{meal_entry['timestamp']};{meal_entry['id']};{meal_entry['meal_name']};{meal_entry['calories']};{meal_entry['protein_g']};{meal_entry['fat_g']};{meal_entry['carbs_g']};{meal_entry['fiber_g']};{vm.get('magnesium_mg', 0)};{vm.get('zinc_mg', 0)};{vm.get('iron_mg', 0)};{vm.get('vitamin_c_mg', 0)};{vm.get('vitamin_d_mcg', 0)};{vm.get('vitamin_b12_mcg', 0)};{vm.get('potassium_mg', 0)};{vm.get('calcium_mg', 0)};{aa.get('lysine_g', 0)};{aa.get('tryptophan_g', 0)}\n"
         f.write(line)
 
     return meal_entry
+
