@@ -60,8 +60,39 @@ def run_test(test_name, test_func):
         return False
 
 
+def test_spoken_time_recognition():
+    """Test spoken meal time recognition (e.g. 'в 14:30 съел творог') vs message recording timestamp fallback."""
+    # Case A: Spoken explicit time "14:30"
+    meal_with_time = {
+        "meal_name": "Овсяная каша",
+        "spoken_time": "14:30:00",
+        "calories": 300,
+        "protein_g": 10.0,
+        "fat_g": 5.0,
+        "carbs_g": 50.0,
+        "source": "APP"
+    }
+    res_time = commit_raw_meal(meal_with_time, source="APP")
+    assert res_time is not None, "Commit failed!"
+    assert "14:30:00" in res_time.get("timestamp"), f"Expected 14:30:00 in timestamp, got {res_time.get('timestamp')}"
+
+    # Case B: No spoken time -> fallback to current exact timestamp
+    meal_no_time = {
+        "meal_name": "Яблоко",
+        "calories": 80,
+        "protein_g": 0.5,
+        "fat_g": 0.2,
+        "carbs_g": 20.0,
+        "source": "APP"
+    }
+    res_no_time = commit_raw_meal(meal_no_time, source="APP")
+    assert res_no_time is not None, "Commit failed!"
+    assert datetime.now().strftime("%Y-%m-%d") in res_no_time.get("timestamp"), "Fallback timestamp missing today's date!"
+
+
 def test_custom_recipe_catalog_matching():
     """Test instant precision matching of custom recipes catalog."""
+
     assert os.path.exists(CUSTOM_RECIPES_FILE), f"Catalog file {CUSTOM_RECIPES_FILE} missing!"
     res = match_custom_recipe("Творог 5% с черникой и орехами")
     assert res is not None, "Failed to match custom recipe!"
@@ -162,13 +193,15 @@ def main():
     print("=" * 70, flush=True)
 
     passed = 0
-    total = 5
+    total = 6
 
-    if run_test("1. Custom Recipe Catalog & Precision Matching", test_custom_recipe_catalog_matching): passed += 1
-    if run_test("2. Strict Write Authorization Policy", test_strict_write_authorization_policy): passed += 1
-    if run_test("3. 26-Sensor Biometrics Telemetry & Stream Pipeline", test_26_sensor_telemetry_pipeline): passed += 1
-    if run_test("4. Tier 2 Master Analytics Center (7d/30d Reports)", test_tier_2_master_analytics_engine): passed += 1
-    if run_test("5. Telegram Bot Clean Card Formatting (0 AI Comments)", test_telegram_card_clean_formatting): passed += 1
+    if run_test("1. Spoken Meal Time Recognition & Timestamp Fallback", test_spoken_time_recognition): passed += 1
+    if run_test("2. Custom Recipe Catalog & Precision Matching", test_custom_recipe_catalog_matching): passed += 1
+    if run_test("3. Strict Write Authorization Policy", test_strict_write_authorization_policy): passed += 1
+    if run_test("4. 26-Sensor Biometrics Telemetry & Stream Pipeline", test_26_sensor_telemetry_pipeline): passed += 1
+    if run_test("5. Tier 2 Master Analytics Center (7d/30d Reports)", test_tier_2_master_analytics_engine): passed += 1
+    if run_test("6. Telegram Bot Clean Card Formatting (0 AI Comments)", test_telegram_card_clean_formatting): passed += 1
+
 
     print("=" * 70, flush=True)
     print(f"📊 SUMMARY RESULTS: {passed}/{total} TESTS PASSED ({int(passed/total*100)}%)", flush=True)
