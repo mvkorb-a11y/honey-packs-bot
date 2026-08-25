@@ -20,10 +20,11 @@ import signal
 import requests
 from datetime import datetime
 
-# Import deep nutrition engine
+from data_ingestion_collector import (
+    parse_raw_food_input,
+    commit_raw_meal
+)
 from food_nutrition_engine import (
-    parse_food_input_deep,
-    commit_meal,
     load_food_diary,
     get_period_summary,
     is_food_query,
@@ -32,6 +33,7 @@ from food_nutrition_engine import (
     parse_and_execute_delete_command,
     parse_and_update_user_profile
 )
+
 
 TELEGRAM_CONFIG_FILE = "telegram_config.json"
 PENDING_MEALS_FILE = "pending_meals.json"
@@ -794,14 +796,17 @@ def handle_update(token, update):
             return
 
         if intent == "FOOD_LOG" or "meal_name" in res_data:
-
             meal_id = str(uuid.uuid4())[:8]
             res_data["meal_id"] = meal_id
             
-            # AUTOMATIC IMMEDIATE COMMIT TO JSON AND CSV
-            committed = commit_meal(res_data)
+            # AUTOMATIC IMMEDIATE COMMIT TO JSON AND CSV VIA TIER 1 DATA INGESTION
+            committed = commit_raw_meal(res_data)
+            if not committed:
+                return
+                
             aa = committed.get("amino_acids", {})
             vm = committed.get("vitamins_minerals", {})
+            source_tag = " [Источник: Библиотека]" if committed.get("source") == "LIBRARY" else ""
             
             header = ""
             if committed.get("transcribed_text"):
@@ -809,7 +814,7 @@ def handle_update(token, update):
 
             msg = (
                 f"{header}"
-                f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*!\n\n"
+                f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*{source_tag}!\n\n"
                 f"*Блюдо*: *{committed.get('meal_name', 'Приём пищи')}*\n"
                 f"*Калории*: `{committed.get('calories', 0)} ккал` | Вес: `{committed.get('estimated_weight_g', 250)}г`\n\n"
                 f"*МАКРОНУТРИЕНТЫ*:\n"
@@ -818,7 +823,6 @@ def handle_update(token, update):
                 f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
                 f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
                 f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
-                f"*Комментарий AI*: _{committed.get('ai_comment', '')}_\n\n"
                 f"_Запись сохранена в базу food_diary.json, food_diary.csv и обновлена на Веб-Дашборде._"
             )
             reply_markup = {
@@ -840,7 +844,7 @@ def handle_update(token, update):
     if photo:
         file_id = photo[-1]["file_id"]
         local_img = download_telegram_file(token, file_id, f"photo_{int(time.time())}.jpg")
-        res_data = parse_food_input_deep("Проанализируй фото: еда или вопрос", image_path=local_img)
+        res_data = parse_raw_food_input("Проанализируй фото: еда или вопрос", image_path=local_img)
         process_result_and_reply(res_data)
         return
 
@@ -848,7 +852,7 @@ def handle_update(token, update):
     if voice:
         file_id = voice["file_id"]
         local_voice = download_telegram_file(token, file_id, f"voice_{int(time.time())}.ogg")
-        res_data = parse_food_input_deep(
+        res_data = parse_raw_food_input(
             "Внимательно послушай аудиозапись. Определи намерение (FOOD_LOG или QUESTION_OR_CHAT) и ответь согласно схеме.",
             audio_path=local_voice
         )
@@ -857,9 +861,10 @@ def handle_update(token, update):
 
     # Text processing
     if text:
-        res_data = parse_food_input_deep(text)
+        res_data = parse_raw_food_input(text)
         process_result_and_reply(res_data)
         return
+
 
 
 
