@@ -213,10 +213,10 @@ def format_360_meal_draft(meal):
         f"• Клетчатка: `{meal['fiber_g']}г` | Сахар: `{meal.get('sugar_g', 0)}г`\n\n"
         f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
         f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
-        f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
-        f"*Комментарий AI*: _{meal['ai_comment']}_"
+        f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n"
     )
     return msg
+
 
 
 
@@ -224,10 +224,13 @@ def send_meal_confirmation_card(token, chat_id, meal_data):
     """Send auto-committed meal card with single cancel/delete inline button."""
     meal_id = str(uuid.uuid4())[:8]
     meal_data["meal_id"] = meal_id
-    committed = commit_meal(meal_data)
+    committed = commit_raw_meal(meal_data, source="APP")
+    if not committed:
+        return
     
     aa = committed.get("amino_acids", {})
     vm = committed.get("vitamins_minerals", {})
+    source_tag = " [Источник: Библиотека]" if committed.get("source") == "LIBRARY" else ""
     
     header = ""
     if committed.get("transcribed_text"):
@@ -235,7 +238,7 @@ def send_meal_confirmation_card(token, chat_id, meal_data):
 
     msg = (
         f"{header}"
-        f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*!\n\n"
+        f"✅ *ЗАПИСАНО В ДНЕВНИК ПИТАНИЯ (JSON & CSV)*{source_tag}!\n\n"
         f"*Блюдо*: *{committed.get('meal_name', 'Приём пищи')}*\n"
         f"*Калории*: `{committed.get('calories', 0)} ккал` | Вес: `{committed.get('estimated_weight_g', 250)}г`\n\n"
         f"*МАКРОНУТРИЕНТЫ*:\n"
@@ -244,9 +247,9 @@ def send_meal_confirmation_card(token, chat_id, meal_data):
         f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
         f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
         f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
-        f"*Комментарий AI*: _{committed.get('ai_comment', '')}_\n\n"
         f"_Запись сохранена в базу food_diary.json, food_diary.csv и обновлена на Веб-Дашборде._"
     )
+
     reply_markup = {
         "inline_keyboard": [
             [{"text": "🗑️ Отменить запись", "callback_data": f"cancel_logged_meal_{meal_id}"}]
