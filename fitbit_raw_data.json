@@ -1,0 +1,61 @@
+{
+  "date": "2026-08-25",
+  "timestamp": "2026-08-25 22:38:00",
+  "device": "Fitbit Air (Google Health API v4 / Wear OS Platform)",
+  "hardware_sensors_count": 6,
+  "metrics_count": 26,
+  "sensors": {
+    "1_ppg_heart_rate": "PPG Optical Heart Rate Sensor (Green/Red/IR LEDs)",
+    "2_ceda_stress": "cEDA Continuous Electrodermal Activity Sensor",
+    "3_skin_thermometer": "Infrared Skin Temperature Sensor",
+    "4_accelerometer_gyro": "3-Axis Accelerometer + Gyroscope",
+    "5_barometric_altimeter": "Barometric Altimeter (Floors & Altitude)",
+    "6_gps_glonass": "Built-in GPS / GLONASS Outdoor Tracking"
+  },
+  "telemetry_26_metrics": {
+    "cardiovascular_domain": {
+      "1_heart_rate_bpm": 68.5,
+      "2_resting_hr_bpm": 48,
+      "3_hrv_rmssd_ms": 65.2,
+      "4_hrv_sdnn_ms": 78.4,
+      "5_active_zone_minutes": 45,
+      "6_vo2_max": 48.5
+    },
+    "sleep_respiratory_domain": {
+      "7_sleep_duration_hours": 7.5,
+      "8_sleep_deep_minutes": 95,
+      "9_sleep_rem_minutes": 110,
+      "10_sleep_light_minutes": 245,
+      "11_sleep_awake_minutes": 28,
+      "12_sleep_efficiency_pct": 91.5,
+      "13_sleep_score": 88,
+      "14_spo2_pct": 97.5,
+      "15_breathing_rate_rpm": 14.2
+    },
+    "stress_ceda_domain": {
+      "16_ceda_body_responses": 12,
+      "17_stress_events_count": 3,
+      "18_stress_management_score": 82
+    },
+    "thermal_domain": {
+      "19_skin_temp_variation_c": -0.2,
+      "20_baseline_skin_temp_c": 34.8
+    },
+    "locomotion_altimeter_domain": {
+      "21_steps_count": 12022,
+      "22_distance_km": 9.22,
+      "23_floors_climbed": 14,
+      "24_active_sport_duration_min": 45
+    },
+    "metabolic_domain": {
+      "25_active_calories_kcal": 1576,
+      "26_tdee_calories_kcal": 4132
+    }
+  },
+  "calculated_biohacking_metrics": {
+    "physical_battery_pct": 86,
+    "mental_battery_pct": 92,
+    "strain_score_whoop": 15.2,
+    "net_caloric_deficit_kcal": -1684
+  }
+}

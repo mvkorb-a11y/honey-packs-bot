@@ -72,8 +72,20 @@ def compute_daily_analytics_summary(days=14):
         distance_km = 9.22 if d_str == "2026-08-23" else (1.8 if d_str == "2026-08-24" else 3.4)
         resting_hr = 45 if d_str == "2026-08-23" else (51 if d_str == "2026-08-24" else 50)
 
-        # Dynamic extraction from Fitbit Air telemetry cache
-        if d_str == t_date and gh:
+        # Dynamic extraction from Fitbit Air 26-metrics telemetry cache
+        telem_26 = telemetry_data.get("telemetry_26_metrics", {})
+        if d_str == t_date and telem_26:
+            cardio = telem_26.get("cardiovascular_domain", {})
+            metabolic = telem_26.get("metabolic_domain", {})
+            locomotion = telem_26.get("locomotion_altimeter_domain", {})
+            
+            resting_hr = cardio.get("2_resting_hr_bpm", resting_hr)
+            tdee_cals = metabolic.get("26_tdee_calories_kcal", tdee_cals)
+            active_cals = metabolic.get("25_active_calories_kcal", active_cals)
+            steps = locomotion.get("21_steps_count", steps)
+            distance_km = locomotion.get("22_distance_km", distance_km)
+
+        elif d_str == t_date and gh:
             steps_dp = gh.get("steps", {}).get("rollupDataPoints", [])
             if steps_dp:
                 total_steps = sum(int(dp.get("steps", {}).get("countSum", 0)) for dp in steps_dp)
@@ -116,7 +128,7 @@ def compute_daily_analytics_summary(days=14):
                 "tryptophan_g": consumed_tryptophan,
                 "omega3_g": consumed_omega3
             },
-            "telemetry_fitbit_air": {
+            "telemetry_fitbit_air_26_metrics": telem_26 if d_str == t_date and telem_26 else {
                 "resting_hr_bpm": resting_hr,
                 "steps_count": steps,
                 "distance_km": distance_km,
@@ -130,6 +142,7 @@ def compute_daily_analytics_summary(days=14):
                 "net_caloric_deficit_kcal": net_deficit
             }
         })
+
 
     output = {
         "daily_summaries": daily_summaries,
