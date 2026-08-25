@@ -85,8 +85,11 @@ def match_custom_recipe(text):
                     match_res = dict(r)
                     match_res["intent"] = "FOOD_LOG"
                     match_res["transcribed_text"] = text
+                    match_res["source"] = "LIBRARY"
+                    match_res["is_custom_matched"] = True
                     print(f"🎯 [CUSTOM RECIPE MATCHED]: {match_res['meal_name']}", flush=True)
                     return match_res
+
     except Exception as e:
         print(f"Recipe catalog check error: {e}", flush=True)
     return None
