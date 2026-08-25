@@ -21,20 +21,12 @@ app = FastAPI(title="Honey Packs 360° Biohacking Dashboard")
 
 @app.on_event("startup")
 def start_background_services():
-    """Launch autonomous 24/7 Telegram Bot and Cloud Fitbit Telemetry Fetcher on Railway startup."""
-    def run_bot():
-        try:
-            print("🚀 [STARTUP]: Launching autonomous 24/7 Telegram Bot subprocess...", flush=True)
-            subprocess.Popen([sys.executable, "telegram_bot.py"])
-        except Exception as e:
-            print(f"Error launching bot subprocess: {e}", flush=True)
-
+    """Launch autonomous 24/7 Cloud Fitbit Telemetry Fetcher on Railway startup."""
     def run_telemetry_loop():
         """Periodically sync Fitbit Air sensor telemetry to Railway cloud storage every hour."""
         while True:
             try:
                 print("⌚ [CLOUD FITBIT TELEMETRY]: Syncing Fitbit Air sensor telemetry to Railway cloud...", flush=True)
-                # Call fitbit sync module if tokens available
                 if os.path.exists("fitbit_tokens.json"):
                     from fitbit_connector import fetch_daily_telemetry
                     fetch_daily_telemetry()
@@ -42,11 +34,9 @@ def start_background_services():
                 print(f"Cloud Fitbit Telemetry sync loop notice: {e}", flush=True)
             time.sleep(3600)  # Sync every 1 hour
 
-    t_bot = threading.Thread(target=run_bot, daemon=True)
-    t_bot.start()
-
     t_telem = threading.Thread(target=run_telemetry_loop, daemon=True)
     t_telem.start()
+
 
 
 
