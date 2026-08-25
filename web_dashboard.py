@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
+import sys
 import subprocess
 import threading
 
@@ -20,17 +21,17 @@ app = FastAPI(title="Honey Packs 360° Biohacking Dashboard")
 
 @app.on_event("startup")
 def start_background_bot():
-    """Launch telegram_bot.py in background daemon thread on server startup."""
+    """Launch telegram_bot.py as a clean background subprocess on server startup."""
     def run_bot():
         try:
-            print("🚀 [STARTUP]: Launching autonomous 24/7 Telegram Bot worker...", flush=True)
-            from telegram_bot import start_bot_daemon
-            start_bot_daemon()
+            print("🚀 [STARTUP]: Launching autonomous 24/7 Telegram Bot subprocess...", flush=True)
+            subprocess.Popen([sys.executable, "telegram_bot.py"])
         except Exception as e:
-            print(f"Error running bot in background: {e}", flush=True)
+            print(f"Error launching bot subprocess: {e}", flush=True)
 
     t = threading.Thread(target=run_bot, daemon=True)
     t.start()
+
 
 
 FOOD_DIARY_FILE = "food_diary.json"
