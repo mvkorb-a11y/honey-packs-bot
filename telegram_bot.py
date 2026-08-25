@@ -58,7 +58,8 @@ def get_telegram_token():
                     return cfg["telegram_bot_token"]
         except Exception:
             pass
-    return "8701390813:AAFYAfk_kWdWMj_-Se8wINeLJZTO4dELzL8"
+    return "8655523437:AAFau3OUqTj453kuM_aT3wDxGwv6CGegJJM"
+
 
 
 
