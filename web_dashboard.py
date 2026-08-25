@@ -482,8 +482,23 @@ def render_dashboard():
     return HTMLResponse(content=html_content)
 
 
+@app.api_route("/api/sync-fitbit", methods=["GET", "POST"])
+def sync_fitbit_on_demand():
+    """On-demand API endpoint triggered when user opens or refreshes dashboard or clicks Refresh button."""
+
+    try:
+        if os.path.exists("fitbit_tokens.json"):
+            from fitbit_connector import fetch_daily_telemetry
+            telemetry = fetch_daily_telemetry()
+            return {"status": "success", "message": "Fitbit telemetry synced on demand", "telemetry": telemetry}
+        return {"status": "notice", "message": "Fitbit tokens not configured yet"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 if __name__ == "__main__":
     uvicorn.run("web_dashboard:app", host="0.0.0.0", port=8000, reload=True)
+
 
 
 
