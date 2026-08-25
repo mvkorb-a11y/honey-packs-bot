@@ -248,8 +248,9 @@ def process_result_and_reply(token, chat_id, res_data):
             f"*МИКРОНУТРИЕНТЫ И АМИНОКИСЛОТЫ*:\n"
             f"• Магний: `{vm.get('magnesium_mg', 0)}мг` | Цинк: `{vm.get('zinc_mg', 0)}мг`\n"
             f"• Лизин: `{aa.get('lysine_g', 0)}г` | Триптофан: `{aa.get('tryptophan_g', 0)}г`\n\n"
-            f"_Запись сохранена в базу food_diary.json, food_diary.csv и обновлена на Веб-Дашборде._"
+            f"_Запись сохранена._"
         )
+
         reply_markup = {
             "inline_keyboard": [
                 [{"text": "🗑️ Отменить запись", "callback_data": f"cancel_logged_meal_{meal_id}"}]
@@ -318,6 +319,7 @@ def handle_update(token, update):
 
     # Process Photo
     if photo:
+        send_telegram_message(token, chat_id, "📷 *Анализирую изображение...*")
         file_id = photo[-1]["file_id"]
         local_img = download_telegram_file(token, file_id, f"photo_{int(time.time())}.jpg")
         res_data = parse_raw_food_input("Проанализируй фото: еда", image_path=local_img)
@@ -326,11 +328,13 @@ def handle_update(token, update):
 
     # Process Voice
     if voice:
+        send_telegram_message(token, chat_id, "🎙️ *Анализирую голосовое сообщение...*")
         file_id = voice["file_id"]
         local_voice = download_telegram_file(token, file_id, f"voice_{int(time.time())}.ogg")
         res_data = parse_raw_food_input(None, audio_path=local_voice)
         process_result_and_reply(token, chat_id, res_data)
         return
+
 
     # Process Text
     if text:

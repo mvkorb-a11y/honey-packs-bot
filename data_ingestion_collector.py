@@ -16,10 +16,12 @@ import os
 import sys
 import json
 import time
+import uuid
 import re
 import base64
 import requests
 from datetime import datetime
+
 
 DIARY_FILE = "food_diary.json"
 DIARY_CSV_FILE = "food_diary.csv"
@@ -261,9 +263,12 @@ def commit_raw_meal(meal_data, source="APP"):
         except Exception:
             diary = {"entries": []}
 
+    m_id = meal_data.get("meal_id") or str(uuid.uuid4())[:8]
     meal_entry = {
-        "id": meal_data.get("meal_id", str(time.time())),
+        "id": m_id,
+        "meal_id": m_id,
         "timestamp": resolved_timestamp,
+
         "meal_name": meal_data.get("meal_name", "Приём пищи"),
         "meal_type": meal_data.get("meal_type", "Meal"),
         "estimated_weight_g": meal_data.get("estimated_weight_g", 250),

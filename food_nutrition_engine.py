@@ -515,12 +515,12 @@ def delete_meals_by_indices(indices_list):
 
 
 def delete_meal_by_id(meal_id):
-    """Delete meal from JSON & CSV diaries by meal_id."""
+    """Delete meal from JSON & CSV diaries by meal_id or id."""
     if not meal_id:
         return False
     diary = load_food_diary()
     entries = diary.get("entries", [])
-    new_entries = [e for e in entries if e.get("meal_id") != meal_id]
+    new_entries = [e for e in entries if e.get("meal_id") != meal_id and e.get("id") != meal_id]
     
     if len(new_entries) == len(entries):
         return False
@@ -529,19 +529,17 @@ def delete_meal_by_id(meal_id):
     save_food_diary(diary)
 
     # Regenerate CSV file completely
-    with open(CSV_FILE, "w", encoding="utf-8-sig") as f:
-        f.write("Дата;Время;Период;Блюдо;Вес (г);Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Сахар (г);Магний (мг);Цинк (мг);Железо (мг);Витамин C (мг)\n")
+    csv_file_path = "food_diary.csv"
+    with open(csv_file_path, "w", encoding="utf-8-sig") as f:
+        f.write("Дата и время;ID;Источник;Название блюда;Калории (ккал);Белок (г);Жиры (г);Углеводы (г);Клетчатка (г);Магний (мг);Цинк (мг);Железо (мг);Витамин C (мг);Витамин D (мкг);Витамин B12 (мкг);Калий (мг);Кальций (мг);Лизин (г);Триптофан (г)\n")
         for e in new_entries:
-            append_to_csv_diary(e)
-
-    # Rebuild daily history
-    try:
-        from daily_biometrics_diary import generate_full_professional_diary
-        generate_full_professional_diary(14)
-    except Exception:
-        pass
+            vm = e.get("vitamins_minerals", {})
+            aa = e.get("amino_acids", {})
+            line = f"{e.get('timestamp')};{e.get('id', e.get('meal_id'))};{e.get('source', 'APP')};{e.get('meal_name')};{e.get('calories')};{e.get('protein_g')};{e.get('fat_g')};{e.get('carbs_g')};{e.get('fiber_g')};{vm.get('magnesium_mg', 0)};{vm.get('zinc_mg', 0)};{vm.get('iron_mg', 0)};{vm.get('vitamin_c_mg', 0)};{vm.get('vitamin_d_mcg', 0)};{vm.get('vitamin_b12_mcg', 0)};{vm.get('potassium_mg', 0)};{vm.get('calcium_mg', 0)};{aa.get('lysine_g', 0)};{aa.get('tryptophan_g', 0)}\n"
+            f.write(line)
 
     return True
+
 
 
 
