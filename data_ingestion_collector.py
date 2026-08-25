@@ -65,19 +65,53 @@ def convert_ogg_to_wav(ogg_path):
     return ogg_path
 
 
+CUSTOM_RECIPES_FILE = "my_custom_recipes.json"
+
+
+def match_custom_recipe(text):
+    """Check if incoming text matches user custom recurring meals catalog."""
+    if not text or not os.path.exists(CUSTOM_RECIPES_FILE):
+        return None
+    
+    try:
+        with open(CUSTOM_RECIPES_FILE, "r", encoding="utf-8") as f:
+            catalog = json.load(f)
+            recipes = catalog.get("recipes", [])
+            
+        text_lower = text.lower().strip()
+        for r in recipes:
+            for kw in r.get("keywords", []):
+                if kw.lower() in text_lower:
+                    match_res = dict(r)
+                    match_res["intent"] = "FOOD_LOG"
+                    match_res["transcribed_text"] = text
+                    print(f"🎯 [CUSTOM RECIPE MATCHED]: {match_res['meal_name']}", flush=True)
+                    return match_res
+    except Exception as e:
+        print(f"Recipe catalog check error: {e}", flush=True)
+    return None
+
+
 def parse_raw_food_input(text_or_dict, image_path=None, audio_path=None):
-    """Ingest raw user input via light Gemini Flash in 1 single call."""
+    """Ingest raw user input via light Gemini Flash in 1 single call with custom recipe matching."""
+    text_input = text_or_dict if isinstance(text_or_dict, str) else text_or_dict.get("text", "")
+    
+    # 1. Fast match against personal custom recipe catalog
+    if text_input and not image_path and not audio_path:
+        custom_match = match_custom_recipe(text_input)
+        if custom_match:
+            return custom_match
+
     api_key = get_gemini_api_key()
     if not api_key:
         return None
 
     model_name = get_gemini_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-
-    text_input = text_or_dict if isinstance(text_or_dict, str) else text_or_dict.get("text", "")
     prompt = text_input
     if audio_path and not prompt:
         prompt = "Послушай эту голосовую аудиозапись. Распознай её дословно в 'transcribed_text' и выполни первичный разбор КБЖУ."
+
 
     system_instruction = (
         "You are a fast FoodTech data ingestion parser.\n"

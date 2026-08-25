@@ -1,0 +1,100 @@
+{
+  "recipes": [
+    {
+      "keywords": ["творог", "сырник", "творог с черникой"],
+      "meal_name": "Творог 5% с черникой и орехами",
+      "meal_type": "Snack",
+      "estimated_weight_g": 250,
+      "calories": 420,
+      "protein_g": 32.0,
+      "fat_g": 14.0,
+      "carbs_g": 18.0,
+      "fiber_g": 3.5,
+      "sugar_g": 10.0,
+      "amino_acids": {
+        "lysine_g": 2.6,
+        "leucine_g": 3.1,
+        "tryptophan_g": 0.42,
+        "methionine_g": 0.8
+      },
+      "vitamins_minerals": {
+        "magnesium_mg": 85,
+        "zinc_mg": 3.2,
+        "iron_mg": 1.8,
+        "vitamin_c_mg": 12,
+        "vitamin_d_mcg": 0.5,
+        "vitamin_b12_mcg": 0.9,
+        "potassium_mg": 380,
+        "calcium_mg": 320
+      },
+      "omega_3_6": {
+        "omega3_g": 0.9,
+        "omega6_g": 2.4
+      }
+    },
+    {
+      "keywords": ["омлет", "яйца", "яйцо", "глазунья"],
+      "meal_name": "Омлет из 3 яиц с зеленью и авокадо",
+      "meal_type": "Breakfast",
+      "estimated_weight_g": 260,
+      "calories": 380,
+      "protein_g": 24.0,
+      "fat_g": 26.0,
+      "carbs_g": 5.0,
+      "fiber_g": 4.0,
+      "sugar_g": 1.2,
+      "amino_acids": {
+        "lysine_g": 1.9,
+        "leucine_g": 2.2,
+        "tryptophan_g": 0.38,
+        "methionine_g": 0.75
+      },
+      "vitamins_minerals": {
+        "magnesium_mg": 65,
+        "zinc_mg": 3.6,
+        "iron_mg": 3.8,
+        "vitamin_c_mg": 8,
+        "vitamin_d_mcg": 2.4,
+        "vitamin_b12_mcg": 1.6,
+        "potassium_mg": 420,
+        "calcium_mg": 140
+      },
+      "omega_3_6": {
+        "omega3_g": 0.6,
+        "omega6_g": 3.1
+      }
+    },
+    {
+      "keywords": ["шейк", "овсяно-конопляный", "протеиновый коктейль", "смузи"],
+      "meal_name": "Овсяно-Конопляный Протеиновый Шейк",
+      "meal_type": "Meal",
+      "estimated_weight_g": 350,
+      "calories": 490,
+      "protein_g": 30.0,
+      "fat_g": 8.0,
+      "carbs_g": 65.0,
+      "fiber_g": 9.0,
+      "sugar_g": 12.0,
+      "amino_acids": {
+        "lysine_g": 1.8,
+        "leucine_g": 2.5,
+        "tryptophan_g": 0.45,
+        "methionine_g": 0.6
+      },
+      "vitamins_minerals": {
+        "magnesium_mg": 180,
+        "zinc_mg": 4.8,
+        "iron_mg": 5.2,
+        "vitamin_c_mg": 15,
+        "vitamin_d_mcg": 1.0,
+        "vitamin_b12_mcg": 1.2,
+        "potassium_mg": 560,
+        "calcium_mg": 280
+      },
+      "omega_3_6": {
+        "omega3_g": 1.4,
+        "omega6_g": 3.8
+      }
+    }
+  ]
+}
