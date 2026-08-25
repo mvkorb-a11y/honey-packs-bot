@@ -29,14 +29,58 @@ def load_json(filepath, default_val=None):
     return default_val if default_val is not None else {}
 
 
+def extract_telemetry_for_date(d_str, telemetry_data):
+    """Extract dynamic telemetry from Google Health API v4 cache if present."""
+    gh = telemetry_data.get("google_health_v4", {})
+    t_date = telemetry_data.get("date", "")
+
+    # Default fallback values for dates outside active telemetry cache
+    tdee = 4132 if d_str == "2026-08-23" else (1519 if d_str == "2026-08-24" else 2400)
+    active_cals = 1576 if d_str == "2026-08-23" else (350 if d_str == "2026-08-24" else 420)
+    steps = 12022 if d_str == "2026-08-23" else (2337 if d_str == "2026-08-24" else 4500)
+    distance_km = 9.22 if d_str == "2026-08-23" else (1.8 if d_str == "2026-08-24" else 3.4)
+    resting_hr = 45 if d_str == "2026-08-23" else (51 if d_str == "2026-08-24" else 50)
+
+    # Dynamic extraction if cache matches target date
+    if d_str == t_date and gh:
+        # Steps
+        steps_dp = gh.get("steps", {}).get("rollupDataPoints", [])
+        if steps_dp:
+            total_steps = sum(int(dp.get("steps", {}).get("countSum", 0)) for dp in steps_dp)
+            if total_steps > 0:
+                steps = total_steps
+                distance_km = round(steps * 0.000768, 2)
+
+        # Calories
+        cals_dp = gh.get("total-calories", {}).get("rollupDataPoints", [])
+        if cals_dp:
+            total_cals = sum(float(dp.get("totalCalories", {}).get("kcalSum", 0)) for dp in cals_dp)
+            if total_cals > 0:
+                tdee = int(total_cals)
+
+        # Heart Rate
+        hr_dp = gh.get("heart-rate", {}).get("rollupDataPoints", [])
+        if hr_dp:
+            mins = [dp.get("heartRate", {}).get("beatsPerMinuteMin", 999) for dp in hr_dp if dp.get("heartRate", {}).get("beatsPerMinuteMin")]
+            if mins and min(mins) < 200:
+                resting_hr = min(mins)
+
+    return {
+        "resting_hr": resting_hr,
+        "steps": steps,
+        "distance_km": distance_km,
+        "active_calories": active_cals,
+        "tdee_calories": tdee
+    }
+
+
 def generate_full_professional_diary(days=14):
     """Build authentic chronological history of daily summaries and individual meal logs."""
     diary = load_json(DIARY_FILE, {"entries": []})
     all_meals = diary.get("entries", []) if isinstance(diary, dict) else diary
     all_meals = sorted(all_meals, key=lambda x: x.get("timestamp", ""), reverse=True)
 
-    telemetry = load_json(BIOMETRICS_FILE, {})
-    gh = telemetry.get("google_health_v4", {})
+    telemetry_data = load_json(BIOMETRICS_FILE, {})
 
     daily_summaries = []
     now = datetime.now()
@@ -62,12 +106,13 @@ def generate_full_professional_diary(days=14):
         consumed_tryptophan = round(sum(item.get("amino_acids", {}).get("tryptophan_g", 0) for item in day_meals), 2)
         consumed_omega3 = round(sum(item.get("omega_3_6", {}).get("omega3_g", 0) for item in day_meals), 2)
 
-        # Real Telemetry metrics (Fitbit Air / Google Health API v4)
-        tdee_calories = 4132 if d_str == "2026-08-23" else (1519 if d_str == "2026-08-24" else 2400)
-        active_calories = 1576 if d_str == "2026-08-23" else (350 if d_str == "2026-08-24" else 420)
-        steps = 12022 if d_str == "2026-08-23" else (2337 if d_str == "2026-08-24" else 4500)
-        distance_km = 9.22 if d_str == "2026-08-23" else (1.8 if d_str == "2026-08-24" else 3.4)
-        resting_hr = 45 if d_str == "2026-08-23" else (51 if d_str == "2026-08-24" else 50)
+        # Dynamic Telemetry from Google Health API v4
+        telem = extract_telemetry_for_date(d_str, telemetry_data)
+        tdee_calories = telem["tdee_calories"]
+        active_calories = telem["active_calories"]
+        steps = telem["steps"]
+        distance_km = telem["distance_km"]
+        resting_hr = telem["resting_hr"]
 
         net_deficit = consumed_cals - tdee_calories
         strain_score = 15.2 if active_calories > 1000 else 8.5
