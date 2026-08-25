@@ -35,12 +35,14 @@ from food_nutrition_engine import (
 )
 
 
+BOT_VERSION = "2026-08-25-V5-ZERO-AI-COMMENTS"
 TELEGRAM_CONFIG_FILE = "telegram_config.json"
 PENDING_MEALS_FILE = "pending_meals.json"
 DIARY_FILE = "food_diary.json"
 USER_PROFILE_FILE = "user_profile.json"
 PID_FILE = "bot_daemon.pid"
 TEMP_MEDIA_DIR = "temp_media"
+
 
 # User states dictionary for conversational state tracking
 user_states = {}
