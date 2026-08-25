@@ -178,17 +178,19 @@ def parse_raw_food_input(text_or_dict, image_path=None, audio_path=None):
     return None
 
 
-def commit_raw_meal(meal_data, source="LIBRARY"):
+def commit_raw_meal(meal_data, source="APP"):
     """
     Save meal entry into food_diary.json & food_diary.csv under Strict Write Authorization Rule.
-    Authorized sources: 'LIBRARY' (my_custom_recipes.json), 'ANALYTICS_ENGINE' (Tier 2), 'APP' (App UI).
+    Authorized sources: 'LIBRARY' (my_custom_recipes.json), 'ANALYTICS_ENGINE' (Tier 2), 'APP' (App UI / Bot).
     """
-    authorized_sources = ["LIBRARY", "ANALYTICS_ENGINE", "APP"]
+    authorized_sources = ["LIBRARY", "ANALYTICS_ENGINE", "APP", "TELEGRAM"]
     is_custom_matched = meal_data.get("source") == "LIBRARY" or meal_data.get("is_custom_matched") is True
+    actual_source = "LIBRARY" if is_custom_matched else (meal_data.get("source") or source)
     
-    if source not in authorized_sources and not is_custom_matched:
-        print(f"⚠️ [WRITE REJECTED]: Unverified write source '{source}'. Entries must originate from LIBRARY, ANALYTICS_ENGINE or APP.", flush=True)
+    if actual_source not in authorized_sources:
+        print(f"⚠️ [WRITE REJECTED]: Unverified write source '{actual_source}'. Entries must originate from LIBRARY, ANALYTICS_ENGINE, APP or TELEGRAM.", flush=True)
         return None
+
 
     diary = {"entries": []}
     if os.path.exists(DIARY_FILE):

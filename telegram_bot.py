@@ -801,9 +801,10 @@ def handle_update(token, update):
             res_data["meal_id"] = meal_id
             
             # AUTOMATIC IMMEDIATE COMMIT TO JSON AND CSV VIA TIER 1 DATA INGESTION
-            committed = commit_raw_meal(res_data)
+            committed = commit_raw_meal(res_data, source="APP")
             if not committed:
                 return
+
                 
             aa = committed.get("amino_acids", {})
             vm = committed.get("vitamins_minerals", {})
