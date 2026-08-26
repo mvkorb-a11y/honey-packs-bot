@@ -150,35 +150,45 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     prompt = text_input or ""
     if audio_path and not prompt:
-        prompt = "Послушай эту голосовую аудиозапись. Распознай её дословно в 'transcribed_text' и выполни первичный разбор КБЖУ."
+        prompt = (
+            "Послушай эту русскую голосовую аудиозапись:\n"
+            "1. Дословно запиши весь текст в 'transcribed_text'.\n"
+            "2. Выдели все упомянутые продукты, блюда, ингредиенты и напитки (даже если пользователь говорит сложно: 'сегодня я на завтрак ел...', 'пообедал супом и котлетой', 'выпил кофе с молоком').\n"
+            "3. Сформируй понятное русское название блюда/приёма пищи в 'meal_name'.\n"
+            "4. Определи 'meal_type' (Breakfast, Lunch, Dinner, Snack).\n"
+            "5. Рассчитай суммарный вес 'estimated_weight_g', суммарные калории 'calories', макросы (белки, жиры, углеводы, клетчатка, сахар), аминокислоты и витамины.\n"
+            "6. Выведи результат СТРОГО в формате JSON SCHEMA 1 (FOOD_LOG)."
+        )
 
     system_instruction = (
-        "You are an expert FoodTech Data Ingestion Parser.\n"
-        "FOR AUDIO VOICE NOTES: Transcribe spoken Russian audio text word-for-word into 'transcribed_text'.\n"
-        "FOR ANY FOOD OR DRINK MENTIONED (e.g., 'творог', 'два яблока', 'овсянка', 'плов', 'кофе', 'курица', 'салат', 'чиа'):\n"
-        "1. ALWAYS set \"intent\": \"FOOD_LOG\".\n"
-        "2. Identify the clear Russian product name in 'meal_name' (e.g. 'Творог 5%', 'Яблоки', 'Овсяная каша').\n"
-        "3. If weight is stated (e.g., '150г', '200 грамм'), use that exact weight in 'estimated_weight_g'.\n"
-        "4. If quantity is in units or not specified (e.g., 'творог', '2 яблока', 'чашка кофе'), ESTIMATE standard single-serving weight in grams (e.g., 150g for cottage cheese, 300g for 2 apples, 250g for oatmeal/pilaft, 200g for soup, 100g for bread/snack).\n"
-        "5. Accurately calculate calories, macros (protein, fat, carbs, fiber, sugar), 4 amino acids (lysine, leucine, tryptophan, methionine), and vitamins/minerals for that weight.\n"
-        "6. DO NOT write conversational text or advice. Output ONLY JSON.\n\n"
+        "You are an expert Russian FoodTech Data Ingestion AI.\n"
+        "FOR AUDIO VOICE NOTES: Transcribe spoken Russian audio text word-for-word into 'transcribed_text'.\n\n"
+        "RULES FOR PARSING FOOD, DRINKS & MEALS (INCLUDING COMPLEX CONVERSATIONAL SENTENCES):\n"
+        "1. If the user mentions ANY food, meal, beverage, or recipe (simple like 'творог', or conversational like 'сегодня я на завтрак ел яичницу с тостом и кофе', 'пообедал борщом в 14:00'):\n"
+        "   - ALWAYS set \"intent\": \"FOOD_LOG\".\n"
+        "   - Synthesize a concise, clear Russian title in 'meal_name' (e.g. 'Яичница с тостом и кофе', 'Борщ с хлебом', 'Овсяная каша с ягодами').\n"
+        "   - Extract 'meal_type' ('Breakfast' if завтрак/утро, 'Lunch' if обед/день, 'Dinner' if ужин/вечер, 'Snack' if перекус).\n"
+        "   - If explicit time is spoken (e.g., 'в 9 утра', 'в 14:30', '13:00'), extract to 'spoken_time' (format 'HH:MM:SS').\n"
+        "   - Calculate total estimated weight in grams ('estimated_weight_g') for all components combined.\n"
+        "   - Accurately calculate total combined calories, macros (protein, fat, carbs, fiber, sugar), 4 amino acids (lysine, leucine, tryptophan, methionine), and key vitamins/minerals.\n"
+        "2. DO NOT write conversational text, markdown chatter, or advice. Output ONLY raw JSON.\n\n"
         "SCHEMA 1 (FOOD_LOG):\n"
         "{\n"
         '  "intent": "FOOD_LOG",\n'
         '  "transcribed_text": "Word-for-word speech transcription",\n'
-        '  "meal_name": "Name of Food in Russian",\n'
+        '  "meal_name": "Synthesized Russian Food/Meal Title",\n'
         '  "meal_type": "Breakfast | Lunch | Snack | Dinner",\n'
-        '  "spoken_time": "HH:MM:SS or null if no explicit time spoken",\n'
-        '  "estimated_weight_g": 150,\n'
-        '  "calories": 180,\n'
-        '  "protein_g": 25.0,\n'
-        '  "fat_g": 7.5,\n'
-        '  "carbs_g": 2.7,\n'
-        '  "fiber_g": 0.0,\n'
-        '  "sugar_g": 2.0,\n'
-        '  "amino_acids": {"lysine_g": 2.1, "leucine_g": 2.5, "tryptophan_g": 0.3, "methionine_g": 0.7},\n'
-        '  "vitamins_minerals": {"magnesium_mg": 30, "zinc_mg": 1.0, "iron_mg": 0.2, "vitamin_c_mg": 0, "vitamin_d_mcg": 0.1, "vitamin_b12_mcg": 0.6, "potassium_mg": 170, "calcium_mg": 240},\n'
-        '  "omega_3_6": {"omega3_g": 0.05, "omega6_g": 0.3}\n'
+        '  "spoken_time": "HH:MM:SS or null",\n'
+        '  "estimated_weight_g": 300,\n'
+        '  "calories": 350,\n'
+        '  "protein_g": 22.0,\n'
+        '  "fat_g": 12.0,\n'
+        '  "carbs_g": 38.0,\n'
+        '  "fiber_g": 4.0,\n'
+        '  "sugar_g": 5.0,\n'
+        '  "amino_acids": {"lysine_g": 1.8, "leucine_g": 2.2, "tryptophan_g": 0.3, "methionine_g": 0.5},\n'
+        '  "vitamins_minerals": {"magnesium_mg": 45, "zinc_mg": 1.5, "iron_mg": 1.8, "vitamin_c_mg": 10, "vitamin_d_mcg": 0.5, "vitamin_b12_mcg": 0.8, "potassium_mg": 300, "calcium_mg": 150},\n'
+        '  "omega_3_6": {"omega3_g": 0.2, "omega6_g": 0.8}\n'
         "}\n\n"
         "SCHEMA 2 (NON_FOOD_INPUT):\n"
         "{\n"
@@ -186,6 +196,7 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         '  "transcribed_text": "Word-for-word speech transcription"\n'
         "}"
     )
+
 
 
     parts = [{"text": f"{system_instruction}\n\nUser Input: {prompt}"}]
