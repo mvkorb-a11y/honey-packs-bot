@@ -217,6 +217,15 @@ def test_behavioral_actions_domain_engine():
     assert os.path.exists(ACTIONS_JSON_FILE), "Actions domain database file missing!"
 
 
+def test_daily_nightly_analyst_engine():
+    """Test compiling 24h mathematical dossier and generating AI nightly biohacking audit."""
+    from daily_nightly_analyst import compile_daily_dossier, execute_nightly_audit, NIGHTLY_REPORTS_JSON
+    dossier = compile_daily_dossier("2026-08-26")
+    assert dossier is not None and "nutrition_totals" in dossier, "Dossier compilation failed!"
+    
+    rep = execute_nightly_audit("2026-08-26")
+    assert rep is not None and len(rep) > 50, "Nightly report generation failed!"
+    assert os.path.exists(NIGHTLY_REPORTS_JSON), "Nightly reports database missing!"
 
 
 def main():
@@ -225,7 +234,7 @@ def main():
     print("=" * 70, flush=True)
 
     passed = 0
-    total = 7
+    total = 8
 
     if run_test("1. Spoken Meal Time Recognition & Timestamp Fallback", test_spoken_time_recognition): passed += 1
     if run_test("2. Custom Recipe Catalog & Precision Matching", test_custom_recipe_catalog_matching): passed += 1
@@ -234,6 +243,7 @@ def main():
     if run_test("5. Tier 2 Master Analytics Center (7d/30d Reports)", test_tier_2_master_analytics_engine): passed += 1
     if run_test("6. Telegram Bot Clean Card Formatting (0 AI Comments)", test_telegram_card_clean_formatting): passed += 1
     if run_test("7. Autonomous Behavioral Actions Domain Engine & DB", test_behavioral_actions_domain_engine): passed += 1
+    if run_test("8. Daily Nightly AI Biohacking Analyst (23:00 Cron)", test_daily_nightly_analyst_engine): passed += 1
 
 
     print("=" * 70, flush=True)

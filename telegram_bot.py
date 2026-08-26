@@ -342,11 +342,21 @@ def handle_update(token, update):
     if text and text.startswith("/"):
         cmd = text.split()[0].lower()
         if cmd == "/start":
-            send_telegram_message(token, chat_id, "👋 *Добро пожаловать в 360° Biohacking Bot!*\n\nОтправьте голосом или текстом ваше блюдо (например: _'Творог 200г'_ или _'в 14:30 съел овсянку'_).")
+            send_telegram_message(token, chat_id, "👋 *Добро пожаловать в 360° Biohacking Bot!*\n\nОтправьте голосом или текстом ваше блюдо (например: _'Творог 200г'_ или _'в 14:30 съел овсянку'_).\n\nКоманды:\n• `/today` — список записей за сегодня\n• `/report` — вечерний ИИ-аудит дня и план на завтра")
             return
         elif cmd in ["/today", "/diary", "/list"]:
             send_daily_stats_summary_only(token, chat_id)
             return
+        elif cmd in ["/report", "/audit", "/nightly", "/evening"]:
+            send_telegram_message(token, chat_id, "🧠 *Формирую вечерний ИИ-аудит дня и рекомендации на завтра...*")
+            try:
+                from daily_nightly_analyst import execute_nightly_audit
+                rep = execute_nightly_audit()
+                send_telegram_message(token, chat_id, rep)
+            except Exception as e:
+                send_telegram_message(token, chat_id, f"⚠️ Ошибка генерации отчёта: {e}")
+            return
+
 
     # Process Photo
     if photo:
@@ -398,6 +408,37 @@ def ensure_single_instance():
         f.write(str(my_pid))
 
 
+def run_nightly_scheduler_loop(token):
+    """Background worker checking 23:00 Europe/Tallinn time to auto-send daily report."""
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Europe/Tallinn")
+    except Exception:
+        tz = None
+
+    last_sent_date = ""
+    while True:
+        try:
+            now = datetime.now(tz) if tz else datetime.now()
+            cur_date = now.strftime("%Y-%m-%d")
+            if now.hour == 23 and now.minute == 0 and cur_date != last_sent_date:
+                chat_id = None
+                if os.path.exists(CONFIG_FILE):
+                    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                        chat_id = cfg.get("allowed_user_id")
+                if chat_id:
+                    from daily_nightly_analyst import execute_nightly_audit
+                    rep = execute_nightly_audit()
+                    send_telegram_message(token, chat_id, rep)
+                    last_sent_date = cur_date
+                    print(f"🌙 [NIGHTLY 23:00 REPORT SENT]: Date {cur_date} to Chat {chat_id}", flush=True)
+            time.sleep(30)
+        except Exception as e:
+            print(f"Scheduler loop error: {e}", flush=True)
+            time.sleep(30)
+
+
 def start_bot_daemon():
     """Run 24/7 Long Polling Daemon loop with PID single-instance lock."""
     ensure_single_instance()
@@ -406,8 +447,15 @@ def start_bot_daemon():
     print(f"24/7 AUTONOMOUS TELEGRAM BIOHACKING BOT STARTED ({BOT_VERSION} | PID: {os.getpid()})", flush=True)
     print("=" * 65, flush=True)
 
+    # Start 23:00 Nightly Analyst Thread
+    import threading
+    sched_thread = threading.Thread(target=run_nightly_scheduler_loop, args=(token,), daemon=True)
+    sched_thread.start()
+    print("⏰ [NIGHTLY SCHEDULER ACTIVE]: 23:00 Europe/Tallinn auto-audit enabled", flush=True)
+
     offset = 0
     url = f"https://api.telegram.org/bot{token}/getUpdates"
+
 
     while True:
         try:
