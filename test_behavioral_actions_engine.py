@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 """
-Test Suite: Autonomous Behavioral Actions Engine (Tier 2 Intelligence)
+Test Suite: Probabilistic Multi-Metric Behavioral Actions Engine (Tier 2 Intelligence)
 Project: Honey Packs Health AI
 
 Verifies:
-1. Mathematical signature distance calculation.
-2. Classification of distinct states (Sleep, Office Work, Targeted Walking, Jogging, Postprandial).
-3. Reconstructing 24-hour daily timeline from real telemetry dataset.
-4. Isolated domain database creation in `analytics_db/daily_actions.json` and `analytics_db/daily_actions.csv`.
+1. Multi-metric Bayesian probability evaluation.
+2. Cross-sensor state classification (Sleep, Sedentary Desk, Indoor NEAT, Targeted Walking, Meal Digestion).
+3. Reconstructing 24-hour daily timeline calibrated to real telemetry.
+4. Isolated domain database creation in `analytics_db/daily_actions.json`.
 """
 
 import os
 import sys
 import json
-from activity_signatures_registry import ACTIVITY_SIGNATURES, calculate_hrr_percentage
 from behavioral_actions_engine import (
-    classify_time_slice,
+    evaluate_action_probabilities,
     reconstruct_daily_behavioral_flow,
-    ACTIONS_JSON_FILE,
-    ACTIONS_CSV_FILE
+    ACTIONS_JSON_FILE
 )
 
 
@@ -32,39 +30,38 @@ def run_test(name, func):
         return False
 
 
-def test_signature_math_classification():
-    """Test classification of distinct activities based on mathematical thresholds."""
-    # 1. Deep Sleep: 0 cadence, 48 BPM
-    key, sig, conf = classify_time_slice(cadence_spm=0, avg_hr=48.0)
-    assert key in ["SLEEP_DEEP", "SLEEP_REM_LIGHT"], f"Expected sleep state, got {key}"
-    assert conf > 0.7, f"Confidence too low: {conf}"
+def test_probabilistic_classification():
+    """Test multi-metric classification with cross-sensor consensus."""
+    # 1. Deep Sleep: 0 steps, 48.5 BPM (close to RHR), low spread
+    p_sleep = evaluate_action_probabilities(step_count=0, avg_hr=48.5, min_hr=45.0, max_hr=58.0, kcal_burned=81.5)
+    assert p_sleep[0]["action_key"] == "SLEEP", f"Expected SLEEP, got {p_sleep[0]['action_key']}"
+    assert p_sleep[0]["probability_pct"] > 80.0, f"Probability too low: {p_sleep[0]['probability_pct']}%"
 
-    # 2. Sedentary Office Work: 2 SPM, 62 BPM
-    key, sig, conf = classify_time_slice(cadence_spm=2, avg_hr=62.0)
-    assert key in ["SEDENTARY_WORK", "PASSIVE_REST"], f"Expected sedentary office, got {key}"
+    # 2. Sedentary Desk Work: 30 steps/hr, 59 BPM
+    p_desk = evaluate_action_probabilities(step_count=30, avg_hr=59.0, min_hr=53.0, max_hr=68.0, kcal_burned=89.0)
+    assert p_desk[0]["action_key"] == "SEDENTARY_WORK", f"Expected SEDENTARY_WORK, got {p_desk[0]['action_key']}"
 
-    # 3. Targeted Walking: 75 SPM, 82 BPM
-    key, sig, conf = classify_time_slice(cadence_spm=75, avg_hr=82.0)
-    assert key in ["TARGETED_WALKING", "LIGHT_NEAT_MOVEMENT"], f"Expected walking, got {key}"
+    # 3. Indoor NEAT Mobility: 350 steps/hr, 63 BPM
+    p_neat = evaluate_action_probabilities(step_count=350, avg_hr=63.0, min_hr=55.0, max_hr=88.0, kcal_burned=117.0)
+    assert p_neat[0]["action_key"] == "INDOOR_MOBILITY_NEAT", f"Expected INDOOR_MOBILITY_NEAT, got {p_neat[0]['action_key']}"
 
-    # 4. Running / High Intensity Cardio: 155 SPM, 130 BPM
-    key, sig, conf = classify_time_slice(cadence_spm=155, avg_hr=130.0)
-    assert key == "RUNNING_JOGGING", f"Expected running, got {key}"
+    # 4. Targeted Outdoor Walking: 850 steps/hr, 78 BPM
+    p_walk = evaluate_action_probabilities(step_count=850, avg_hr=78.0, min_hr=65.0, max_hr=95.0, kcal_burned=180.0)
+    assert p_walk[0]["action_key"] == "TARGETED_WALKING", f"Expected TARGETED_WALKING, got {p_walk[0]['action_key']}"
 
-    # 5. Postprandial Digestion: 1 SPM, 68 BPM with is_postprandial=True
-    key, sig, conf = classify_time_slice(cadence_spm=1, avg_hr=68.0, is_postprandial=True)
-    assert key == "MEAL_DIGESTION", f"Expected meal digestion, got {key}"
+    # 5. Meal Digestion: is_postprandial=True, 150 steps/hr, 64 BPM
+    p_meal = evaluate_action_probabilities(step_count=150, avg_hr=64.0, min_hr=55.0, max_hr=80.0, kcal_burned=100.0, is_postprandial=True)
+    assert p_meal[0]["action_key"] == "MEAL_DIGESTION", f"Expected MEAL_DIGESTION, got {p_meal[0]['action_key']}"
 
 
 def test_daily_flow_timeline_reconstruction():
-    """Test full 24-hour daily timeline reconstruction from real telemetry logs."""
+    """Test full 24-hour daily timeline reconstruction from real telemetry dataset."""
     flow = reconstruct_daily_behavioral_flow("2026-08-26")
     assert flow is not None, "Failed to reconstruct daily behavioral flow!"
     assert len(flow["hourly_timeline"]) == 24, f"Expected 24 hourly slices, got {len(flow['hourly_timeline'])}"
     
     # Check domain database existence
     assert os.path.exists(ACTIONS_JSON_FILE), f"Database file {ACTIONS_JSON_FILE} missing!"
-    assert os.path.exists(ACTIONS_CSV_FILE), f"Database file {ACTIONS_CSV_FILE} missing!"
 
     # Verify JSON database content
     with open(ACTIONS_JSON_FILE, "r", encoding="utf-8") as f:
@@ -80,7 +77,7 @@ def main():
     passed = 0
     total = 2
 
-    if run_test("1. Mathematical Signature Classification", test_signature_math_classification): passed += 1
+    if run_test("1. Multi-Metric Probabilistic Classification", test_probabilistic_classification): passed += 1
     if run_test("2. 24-Hour Timeline & Domain DB Generation", test_daily_flow_timeline_reconstruction): passed += 1
 
     print("=" * 65, flush=True)

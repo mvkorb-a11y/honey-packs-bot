@@ -205,16 +205,17 @@ def test_telegram_card_clean_formatting():
 
 def test_behavioral_actions_domain_engine():
     """Test 100% deterministic mathematical classification of daily behavioral activities."""
-    from behavioral_actions_engine import classify_time_slice, reconstruct_daily_behavioral_flow, ACTIONS_JSON_FILE
-    k_sleep, _, _ = classify_time_slice(0, 48.0)
-    assert k_sleep in ["SLEEP_DEEP", "SLEEP_REM_LIGHT"], f"Expected sleep, got {k_sleep}"
+    from behavioral_actions_engine import evaluate_action_probabilities, reconstruct_daily_behavioral_flow, ACTIONS_JSON_FILE
+    p_sleep = evaluate_action_probabilities(step_count=0, avg_hr=48.5, min_hr=45.0, max_hr=58.0, kcal_burned=81.5)
+    assert p_sleep[0]["action_key"] == "SLEEP", f"Expected sleep, got {p_sleep[0]['action_key']}"
 
-    k_walk, _, _ = classify_time_slice(75, 82.0)
-    assert k_walk in ["TARGETED_WALKING", "LIGHT_NEAT_MOVEMENT"], f"Expected walking, got {k_walk}"
+    p_walk = evaluate_action_probabilities(step_count=850, avg_hr=78.0, min_hr=65.0, max_hr=95.0, kcal_burned=180.0)
+    assert p_walk[0]["action_key"] == "TARGETED_WALKING", f"Expected walking, got {p_walk[0]['action_key']}"
 
     flow = reconstruct_daily_behavioral_flow("2026-08-26")
     assert flow is not None and len(flow["hourly_timeline"]) == 24, "Timeline reconstruction failed!"
     assert os.path.exists(ACTIONS_JSON_FILE), "Actions domain database file missing!"
+
 
 
 
