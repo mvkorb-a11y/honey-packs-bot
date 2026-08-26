@@ -204,8 +204,9 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
 
     payload = {"contents": [{"parts": parts}]}
     
-    # Try configured model, fallback to gemini-2.5-pro if needed
-    candidate_models = [model_name, "gemini-2.5-pro", "gemini-2.5-flash"]
+    # Try configured model, fallback to lightweight gemini-2.5-flash
+    candidate_models = [model_name, "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
     # De-duplicate list preserving order
     candidate_models = list(dict.fromkeys(candidate_models))
 
