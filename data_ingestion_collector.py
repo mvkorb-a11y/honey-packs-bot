@@ -213,13 +213,17 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
             audio_data = base64.b64encode(f.read()).decode("utf-8")
         parts.append({"inline_data": {"mime_type": mime_type, "data": audio_data}})
 
-    payload = {"contents": [{"parts": parts}]}
+    payload = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 350
+        }
+    }
     
-    # Try configured model, fallback to lightweight gemini-2.5-flash
-    candidate_models = [model_name, "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    # Ultra-economical Flash-Lite model cascade ($0.00 Free Tier / $0.00003 per request)
+    candidate_models = ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
 
-    # De-duplicate list preserving order
-    candidate_models = list(dict.fromkeys(candidate_models))
 
     for m in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
