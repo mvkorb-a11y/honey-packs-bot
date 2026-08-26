@@ -196,32 +196,43 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         parts.append({"inline_data": {"mime_type": mime_type, "data": audio_data}})
 
     payload = {"contents": [{"parts": parts}]}
-    try:
-        r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=15)
-        if r.status_code == 200:
-            res_json = r.json()
-            candidates = res_json.get("candidates", [])
-            if candidates and "content" in candidates[0]:
-                parts_resp = candidates[0]["content"].get("parts", [])
-                if parts_resp and "text" in parts_resp[0]:
-                    text_resp = parts_resp[0]["text"].strip()
-                    text_resp = re.sub(r"^```json\s*", "", text_resp)
-                    text_resp = re.sub(r"^```\s*", "", text_resp)
-                    text_resp = re.sub(r"\s*```$", "", text_resp).strip()
-                    json_match = re.search(r"\{.*\}", text_resp, re.DOTALL)
-                    if json_match:
-                        parsed = json.loads(json_match.group(0))
-                        
-                        # Extract spoken time if present in transcription
-                        transcribed = parsed.get("transcribed_text", "")
-                        spoken_t = parse_spoken_time_from_text(transcribed) or parsed.get("spoken_time")
-                        if spoken_t:
-                            parsed["spoken_time"] = spoken_t
-                        return parsed
-    except Exception as e:
-        print(f"Ingestion error: {e}", flush=True)
+    
+    # Try configured model, fallback to gemini-2.5-pro if needed
+    candidate_models = [model_name, "gemini-2.5-pro", "gemini-2.5-flash"]
+    # De-duplicate list preserving order
+    candidate_models = list(dict.fromkeys(candidate_models))
+
+    for m in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+        try:
+            r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=20)
+            if r.status_code == 200:
+                res_json = r.json()
+                candidates = res_json.get("candidates", [])
+                if candidates and "content" in candidates[0]:
+                    parts_resp = candidates[0]["content"].get("parts", [])
+                    if parts_resp and "text" in parts_resp[0]:
+                        text_resp = parts_resp[0]["text"].strip()
+                        text_resp = re.sub(r"^```json\s*", "", text_resp)
+                        text_resp = re.sub(r"^```\s*", "", text_resp)
+                        text_resp = re.sub(r"\s*```$", "", text_resp).strip()
+                        json_match = re.search(r"\{.*\}", text_resp, re.DOTALL)
+                        if json_match:
+                            parsed = json.loads(json_match.group(0))
+                            
+                            # Extract spoken time if present in transcription
+                            transcribed = parsed.get("transcribed_text", "")
+                            spoken_t = parse_spoken_time_from_text(transcribed) or parsed.get("spoken_time")
+                            if spoken_t:
+                                parsed["spoken_time"] = spoken_t
+                            return parsed
+            else:
+                print(f"⚠️ [GEMINI API ERROR] Model {m} returned HTTP {r.status_code}: {r.text[:200]}", flush=True)
+        except Exception as e:
+            print(f"⚠️ Ingestion exception for model {m}: {e}", flush=True)
 
     return None
+
 
 
 def commit_raw_meal(meal_data, source="APP"):

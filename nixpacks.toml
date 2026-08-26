@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python311", "ffmpeg"]
+
+[phases.build]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python3 telegram_bot.py & uvicorn web_dashboard:app --host 0.0.0.0 --port $PORT"
