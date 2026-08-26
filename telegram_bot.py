@@ -64,21 +64,27 @@ def get_telegram_token():
 
 
 def send_telegram_message(token, chat_id, text, reply_markup=None, parse_mode="Markdown"):
-    """Send text message to Telegram user via HTTP API."""
+    """Send text message to Telegram user via HTTP API with automatic plain text retry fallback."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
-        "text": text,
-        "parse_mode": parse_mode
+        "text": text
     }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
         r = requests.post(url, json=payload, timeout=10)
+        if r.status_code != 200 and parse_mode:
+            # Fallback retry without parse_mode if Markdown entities failed
+            payload.pop("parse_mode", None)
+            r = requests.post(url, json=payload, timeout=10)
         return r.status_code == 200
     except Exception as e:
         print(f"Error sending Telegram message: {e}", flush=True)
         return False
+
 
 
 def download_telegram_file(token, file_id, dest_filename):
@@ -338,9 +344,11 @@ def handle_update(token, update):
 
     # Process Text
     if text:
+        send_telegram_message(token, chat_id, "⏳ *Анализирую сообщение...*")
         res_data = parse_raw_food_input(text)
         process_result_and_reply(token, chat_id, res_data)
         return
+
 
 
 def ensure_single_instance():

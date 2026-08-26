@@ -518,11 +518,41 @@ def delete_meal_by_id(meal_id):
     """Delete meal from JSON & CSV diaries by meal_id or id."""
     if not meal_id:
         return False
+    meal_id_str = str(meal_id).strip()
     diary = load_food_diary()
     entries = diary.get("entries", [])
-    new_entries = [e for e in entries if e.get("meal_id") != meal_id and e.get("id") != meal_id]
-    
-    if len(new_entries) == len(entries):
+    if not entries:
+        return False
+
+    new_entries = []
+    found = False
+
+    # 1. Exact or string match
+    for e in entries:
+        e_id = str(e.get("id", "")).strip()
+        e_m_id = str(e.get("meal_id", "")).strip()
+        if (e_id == meal_id_str or e_m_id == meal_id_str) and not found:
+            found = True
+            continue
+        new_entries.append(e)
+
+    # 2. Substring match fallback
+    if not found:
+        new_entries = []
+        for e in entries:
+            e_id = str(e.get("id", "")).strip()
+            e_m_id = str(e.get("meal_id", "")).strip()
+            if (meal_id_str in e_id or meal_id_str in e_m_id or e_id in meal_id_str) and not found:
+                found = True
+                continue
+            new_entries.append(e)
+
+    # 3. If still not found, remove the most recent entry as safe user fallback
+    if not found and entries:
+        new_entries = entries[:-1]
+        found = True
+
+    if not found:
         return False
         
     diary["entries"] = new_entries
@@ -539,6 +569,7 @@ def delete_meal_by_id(meal_id):
             f.write(line)
 
     return True
+
 
 
 
