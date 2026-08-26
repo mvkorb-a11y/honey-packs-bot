@@ -217,12 +217,13 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         "contents": [{"parts": parts}],
         "generationConfig": {
             "temperature": 0.1,
-            "maxOutputTokens": 350
+            "maxOutputTokens": 400
         }
     }
     
-    # Ultra-economical Flash-Lite model cascade ($0.00 Free Tier / $0.00003 per request)
-    candidate_models = ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
+    # Primary: High-intelligence & ultra-cheap Gemini 2.5 Flash ($0.0001/req) -> Fallback: Flash-Lite
+    candidate_models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
 
 
     for m in candidate_models:
