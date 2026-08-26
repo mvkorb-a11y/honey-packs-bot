@@ -203,13 +203,28 @@ def test_telegram_card_clean_formatting():
 
 
 
+def test_behavioral_actions_domain_engine():
+    """Test 100% deterministic mathematical classification of daily behavioral activities."""
+    from behavioral_actions_engine import classify_time_slice, reconstruct_daily_behavioral_flow, ACTIONS_JSON_FILE
+    k_sleep, _, _ = classify_time_slice(0, 48.0)
+    assert k_sleep in ["SLEEP_DEEP", "SLEEP_REM_LIGHT"], f"Expected sleep, got {k_sleep}"
+
+    k_walk, _, _ = classify_time_slice(75, 82.0)
+    assert k_walk in ["TARGETED_WALKING", "LIGHT_NEAT_MOVEMENT"], f"Expected walking, got {k_walk}"
+
+    flow = reconstruct_daily_behavioral_flow("2026-08-26")
+    assert flow is not None and len(flow["hourly_timeline"]) == 24, "Timeline reconstruction failed!"
+    assert os.path.exists(ACTIONS_JSON_FILE), "Actions domain database file missing!"
+
+
+
 def main():
     print("=" * 70, flush=True)
     print("🧪 RUNNING MASTER SYSTEM AUDIT & SUITE TESTS...", flush=True)
     print("=" * 70, flush=True)
 
     passed = 0
-    total = 6
+    total = 7
 
     if run_test("1. Spoken Meal Time Recognition & Timestamp Fallback", test_spoken_time_recognition): passed += 1
     if run_test("2. Custom Recipe Catalog & Precision Matching", test_custom_recipe_catalog_matching): passed += 1
@@ -217,6 +232,7 @@ def main():
     if run_test("4. 26-Sensor Biometrics Telemetry & Stream Pipeline", test_26_sensor_telemetry_pipeline): passed += 1
     if run_test("5. Tier 2 Master Analytics Center (7d/30d Reports)", test_tier_2_master_analytics_engine): passed += 1
     if run_test("6. Telegram Bot Clean Card Formatting (0 AI Comments)", test_telegram_card_clean_formatting): passed += 1
+    if run_test("7. Autonomous Behavioral Actions Domain Engine & DB", test_behavioral_actions_domain_engine): passed += 1
 
 
     print("=" * 70, flush=True)
