@@ -76,7 +76,22 @@ def test_spoken_time_recognition():
     assert res_time is not None, "Commit failed!"
     assert "14:30:00" in res_time.get("timestamp"), f"Expected 14:30:00 in timestamp, got {res_time.get('timestamp')}"
 
-    # Case B: No spoken time -> fallback to current exact timestamp
+    # Case B: Standard preset time for Breakfast when time not explicit
+    meal_breakfast = {
+        "meal_name": "Омлет",
+        "meal_type": "Breakfast",
+        "transcribed_text": "сегодня на завтрак съел омлет",
+        "calories": 220,
+        "protein_g": 14.0,
+        "fat_g": 16.0,
+        "carbs_g": 2.0,
+        "source": "APP"
+    }
+    res_bf = commit_raw_meal(meal_breakfast, source="APP")
+    assert res_bf is not None, "Commit failed!"
+    assert "09:00:00" in res_bf.get("timestamp"), f"Expected 09:00:00 for breakfast, got {res_bf.get('timestamp')}"
+
+    # Case C: No spoken time or meal type -> fallback to current exact timestamp
     meal_no_time = {
         "meal_name": "Яблоко",
         "calories": 80,
@@ -88,6 +103,7 @@ def test_spoken_time_recognition():
     res_no_time = commit_raw_meal(meal_no_time, source="APP")
     assert res_no_time is not None, "Commit failed!"
     assert datetime.now().strftime("%Y-%m-%d") in res_no_time.get("timestamp"), "Fallback timestamp missing today's date!"
+
 
 
 def test_custom_recipe_catalog_matching():

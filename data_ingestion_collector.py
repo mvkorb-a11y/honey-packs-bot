@@ -271,19 +271,42 @@ def commit_raw_meal(meal_data, source="APP"):
         print(f"⚠️ [WRITE REJECTED]: Unverified write source '{actual_source}'. Entries must originate from LIBRARY, ANALYTICS_ENGINE, APP or TELEGRAM.", flush=True)
         return None
 
-    # Resolve Timestamp
-    now_dt = datetime.now()
+    # Resolve Timestamp with User Local Timezone (Europe/Tallinn / UTC+3)
+    try:
+        import zoneinfo
+        user_tz = zoneinfo.ZoneInfo("Europe/Tallinn")
+        now_dt = datetime.now(user_tz)
+    except Exception:
+        now_dt = datetime.now()
+
     now_date_str = now_dt.strftime("%Y-%m-%d")
     now_full_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     resolved_timestamp = meal_data.get("timestamp")
     if not resolved_timestamp:
         spoken_time = meal_data.get("spoken_time")
+        meal_type = (meal_data.get("meal_type") or "").lower()
+        transcribed_lower = (meal_data.get("transcribed_text") or "").lower()
+
+        # 1. Explicit spoken time (e.g. "14:30", "09:00")
         if spoken_time and re.match(r'^\d{2}:\d{2}(:\d{2})?$', spoken_time):
             time_part = spoken_time if len(spoken_time) == 8 else f"{spoken_time}:00"
             resolved_timestamp = f"{now_date_str} {time_part}"
+        
+        # 2. Standard Meal Time presets if meal period was specified without explicit time
+        elif meal_type == "breakfast" or any(kw in transcribed_lower for kw in ["завтрак", "утром", "с утра"]):
+            resolved_timestamp = f"{now_date_str} 09:00:00"
+        elif meal_type == "lunch" or any(kw in transcribed_lower for kw in ["обед", "пообедал", "днём"]):
+            resolved_timestamp = f"{now_date_str} 14:00:00"
+        elif meal_type == "dinner" or any(kw in transcribed_lower for kw in ["ужин", "поужинал", "вечером"]):
+            resolved_timestamp = f"{now_date_str} 19:30:00"
+        elif meal_type == "snack" or any(kw in transcribed_lower for kw in ["перекус", "полдник"]):
+            resolved_timestamp = f"{now_date_str} 16:30:00"
+        
+        # 3. Fallback: Exact recording timestamp of the message
         else:
             resolved_timestamp = now_full_str
+
 
     diary = {"entries": []}
     if os.path.exists(DIARY_FILE):
