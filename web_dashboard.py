@@ -34,8 +34,14 @@ def start_background_services():
                 print(f"Cloud Fitbit Telemetry sync loop notice: {e}", flush=True)
             time.sleep(3600)  # Sync every 1 hour
 
-    t_telem = threading.Thread(target=run_telemetry_loop, daemon=True)
-    t_telem.start()
+@app.get("/version")
+def get_version_info():
+    return {
+        "version": "2026-08-26-RELEASE-V7",
+        "status": "online",
+        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
 
 
 

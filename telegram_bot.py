@@ -33,7 +33,8 @@ from food_nutrition_engine import (
     parse_and_update_user_profile
 )
 
-BOT_VERSION = "2026-08-25-REBUILD-V6"
+BOT_VERSION = "2026-08-26-RELEASE-V7"
+
 TELEGRAM_CONFIG_FILE = "telegram_config.json"
 PENDING_MEALS_FILE = "pending_meals.json"
 DIARY_FILE = "food_diary.json"
