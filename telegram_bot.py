@@ -278,25 +278,48 @@ def process_result_and_reply(token, chat_id, res_data):
         send_telegram_message(token, chat_id, reply)
 
 
+def edit_telegram_message(token, chat_id, message_id, text, parse_mode="Markdown"):
+    """Edit existing Telegram message text and clear inline keyboard."""
+    url = f"https://api.telegram.org/bot{token}/editMessageText"
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "reply_markup": {"inline_keyboard": []}
+    }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        if r.status_code != 200 and parse_mode:
+            payload.pop("parse_mode", None)
+            r = requests.post(url, json=payload, timeout=10)
+        return r.status_code == 200
+    except Exception as e:
+        print(f"Error editing Telegram message: {e}", flush=True)
+        return False
+
+
 def handle_update(token, update):
     """Process incoming Telegram update payload."""
     if "callback_query" in update:
         cb = update["callback_query"]
         cb_id = cb["id"]
-        chat_id = cb["message"]["chat"]["id"]
+        msg_obj = cb.get("message", {})
+        chat_id = msg_obj.get("chat", {}).get("id")
+        message_id = msg_obj.get("message_id")
         data = cb.get("data", "")
 
         if data.startswith("cancel_logged_meal_"):
             meal_id = data.replace("cancel_logged_meal_", "")
             try:
                 from food_nutrition_engine import delete_meal_by_id
-                ok = delete_meal_by_id(meal_id)
-                if ok:
-                    send_telegram_message(token, chat_id, f"🗑️ *Запись (ID: {meal_id}) успешно удалена из базы дневника!*")
-                else:
-                    send_telegram_message(token, chat_id, "⚠️ Запись уже была удалена или не найдена.")
+                delete_meal_by_id(meal_id)
             except Exception as e:
-                send_telegram_message(token, chat_id, f"Error deleting meal: {e}")
+                print(f"Error deleting meal: {e}", flush=True)
+
+            if chat_id and message_id:
+                edit_telegram_message(token, chat_id, message_id, "❌ *ЗАПИСЬ ОТМЕНЕНА И УДАЛЕНА ИЗ ДНЕВНИКА*")
 
         # Answer callback query to stop loading spinner
         try:
@@ -304,6 +327,7 @@ def handle_update(token, update):
         except Exception:
             pass
         return
+
 
     msg = update.get("message")
     if not msg:
