@@ -188,45 +188,18 @@ def send_period_report(token, chat_id, days):
 def process_result_and_reply(token, chat_id, res_data):
     """
     Unified 2-Pathway Telegram Message Dispatcher.
-    Pathway A: Food Ingestion (Tier 1) -> 0 AI comments.
-    Pathway B: Period Reports (Tier 2) -> Aggregated stats.
+    Pathway A: Food Ingestion (Tier 1) -> Prioritized first, displays ingredients breakdown.
+    Pathway B: Period Reports (Tier 2) -> Triggered ONLY on explicit report commands.
     Non-food Fallback: Clean notification without conversational chatter.
     """
     if not res_data:
-        send_telegram_message(token, chat_id, "🎙️ Не удалось обработать сообщение. Назовите блюдо (например: 'Творог 200г').")
+        send_telegram_message(token, chat_id, "🎙️ Не удалось обработать сообщение. Назовите блюдо (например: 'Творог 200г' или 'вчера в 14:30 съел суп').")
         return
 
     intent = res_data.get("intent")
     transcription = (res_data.get("transcribed_text") or "").lower()
 
-    # Check profile update command
-    is_prof_v, prof_msg_v = parse_and_update_user_profile(transcription)
-    if is_prof_v:
-        send_telegram_message(token, chat_id, prof_msg_v)
-        return
-
-    # Check deletion command
-    is_del_v, del_msg_v = parse_and_execute_delete_command(transcription)
-    if is_del_v:
-        send_telegram_message(token, chat_id, del_msg_v)
-        return
-
-    # Check Monthly Report triggers
-    if any(kw in transcription for kw in ["месяц", "30 дн", "отчет за месяц", "месячный отчет"]):
-        send_period_report(token, chat_id, 30)
-        return
-
-    # Check Weekly Report triggers
-    if any(kw in transcription for kw in ["неделя", "7 дн", "отчет за неделю", "недельный отчет"]):
-        send_period_report(token, chat_id, 7)
-        return
-
-    # Check Daily Report triggers
-    if any(kw in transcription for kw in ["день", "сегодня", "итоги дня", "отчет за день", "отчет", "отчёт", "статистика", "покажи дневник"]):
-        send_daily_stats_summary_only(token, chat_id)
-        return
-
-    # PATHWAY A: FOOD INGESTION
+    # PATHWAY A: FOOD INGESTION (PRIORITIZED FIRST)
     if intent == "FOOD_LOG" or "meal_name" in res_data:
         meal_id = str(uuid.uuid4())[:8]
         res_data["meal_id"] = meal_id
@@ -241,7 +214,12 @@ def process_result_and_reply(token, chat_id, res_data):
 
         header = ""
         if committed.get("transcribed_text"):
-            header = f"*Распознано из голоса*: _\"{committed['transcribed_text']}\"_\n\n"
+            header = f"*Распознано из сообщения*: _\"{committed['transcribed_text']}\"_\n\n"
+
+        breakdown_section = ""
+        if committed.get("ingredients_breakdown"):
+            items_str = "\n".join([f"  • {item}" for item in committed["ingredients_breakdown"]])
+            breakdown_section = f"*СОСТАВЛЯЮЩИЕ БЛЮДА:*\n{items_str}\n\n"
 
         msg = (
             f"{header}"
@@ -249,6 +227,7 @@ def process_result_and_reply(token, chat_id, res_data):
             f"*Время*: `{committed.get('timestamp')}`\n"
             f"*Блюдо*: *{committed.get('meal_name', 'Приём пищи')}*\n"
             f"*Калории*: `{committed.get('calories', 0)} ккал` | Вес: `{committed.get('estimated_weight_g', 250)}г`\n\n"
+            f"{breakdown_section}"
             f"*МАКРОНУТРИЕНТЫ*:\n"
             f"• Белок: `{committed.get('protein_g', 0)}г` | Жиры: `{committed.get('fat_g', 0)}г` | Углеводы: `{committed.get('carbs_g', 0)}г`\n"
             f"• Клетчатка: `{committed.get('fiber_g', 0)}г` | Сахар: `{committed.get('sugar_g', 0)}г`\n\n"
@@ -264,19 +243,48 @@ def process_result_and_reply(token, chat_id, res_data):
             ]
         }
         send_telegram_message(token, chat_id, msg, reply_markup=reply_markup)
+        return
 
-    else:
-        # NON-FOOD FALLBACK: Strict Notification (0 AI Chatter)
-        transcription_header = ""
-        if res_data.get("transcribed_text"):
-            transcription_header = f"*Распознано из голоса*: _\"{res_data['transcribed_text']}\"_\n\n"
+    # PATHWAY B: NON-FOOD COMMANDS & REPORTS
+    # Check profile update command
+    is_prof_v, prof_msg_v = parse_and_update_user_profile(transcription)
+    if is_prof_v:
+        send_telegram_message(token, chat_id, prof_msg_v)
+        return
 
-        reply = (
-            f"{transcription_header}"
-            f"🎙️ *Еда не распознана*.\n\n"
-            f"Назовите блюдо (например: _\"Творог 200г\"_ или _\"в 14:30 съел овсянку\"_) или запросите отчёт словами: *день*, *неделя*, *месяц*."
-        )
-        send_telegram_message(token, chat_id, reply)
+    # Check deletion command
+    is_del_v, del_msg_v = parse_and_execute_delete_command(transcription)
+    if is_del_v:
+        send_telegram_message(token, chat_id, del_msg_v)
+        return
+
+    # Check Monthly Report triggers
+    if any(kw in transcription for kw in ["отчет за месяц", "месячный отчет", "статистика за месяц"]):
+        send_period_report(token, chat_id, 30)
+        return
+
+    # Check Weekly Report triggers
+    if any(kw in transcription for kw in ["отчет за неделю", "недельный отчет", "статистика за неделю"]):
+        send_period_report(token, chat_id, 7)
+        return
+
+    # Check Daily Report triggers
+    if any(kw in transcription for kw in ["итоги дня", "отчет за день", "покажи дневник", "дневник за сегодня", "вечерний отчет"]):
+        send_daily_stats_summary_only(token, chat_id)
+        return
+
+    # NON-FOOD FALLBACK: Strict Notification (0 AI Chatter)
+    transcription_header = ""
+    if res_data.get("transcribed_text"):
+        transcription_header = f"*Распознано из сообщения*: _\"{res_data['transcribed_text']}\"_\n\n"
+
+    reply = (
+        f"{transcription_header}"
+        f"🎙️ *Еда не распознана*.\n\n"
+        f"Назовите блюдо (например: _\"Творог 200г\"_ или _\"вчера в 14:30 съел овсянку\"_) или запросите отчёт: `/today`, `/report`."
+    )
+    send_telegram_message(token, chat_id, reply)
+
 
 
 def edit_telegram_message(token, chat_id, message_id, text, parse_mode="Markdown"):

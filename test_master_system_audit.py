@@ -14,7 +14,8 @@ Tests all 5 core subsystems:
 import os
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -103,6 +104,23 @@ def test_spoken_time_recognition():
     res_no_time = commit_raw_meal(meal_no_time, source="APP")
     assert res_no_time is not None, "Commit failed!"
     assert datetime.now().strftime("%Y-%m-%d") in res_no_time.get("timestamp"), "Fallback timestamp missing today's date!"
+
+    # Case D: Spoken Relative Date ("вчера в 14:30 съел творог")
+    meal_yesterday = {
+        "meal_name": "Творог",
+        "transcribed_text": "вчера в 14:30 съел творог",
+        "calories": 180,
+        "protein_g": 25.0,
+        "fat_g": 5.0,
+        "carbs_g": 3.0,
+        "source": "APP"
+    }
+    res_yest = commit_raw_meal(meal_yesterday, source="APP")
+    assert res_yest is not None, "Commit failed!"
+    expected_yest_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    assert expected_yest_date in res_yest.get("timestamp"), f"Expected yesterday date {expected_yest_date}, got {res_yest.get('timestamp')}"
+    assert "14:30:00" in res_yest.get("timestamp"), "Expected 14:30:00 time!"
+
 
 
 

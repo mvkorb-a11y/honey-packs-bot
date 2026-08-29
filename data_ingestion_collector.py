@@ -20,7 +20,8 @@ import uuid
 import re
 import base64
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 
 DIARY_FILE = "food_diary.json"
@@ -73,26 +74,88 @@ def convert_ogg_to_wav(ogg_path):
     return ogg_path
 
 
-def parse_spoken_time_from_text(text):
+def resolve_spoken_date_and_time(text="", meal_type="", spoken_time=None, now_dt=None):
     """
-    Extract spoken time from Russian text (e.g., "в 14:30", "в 9:00", "в 18:45").
-    Returns 'HH:MM:SS' string if found, else None.
+    Extract natural language date & time from Russian speech or text.
+    Handles:
+    - Relative dates: "сегодня", "вчера", "позавчера"
+    - Days of month: "27 августа", "27-го", "27-го числа"
+    - Explicit time: "в 14:30", "в 9:00", "в 15 часов", or explicit spoken_time arg
+    - Standard meal periods: "завтрак" (09:00), "обед" (14:00), "ужин" (19:30), "перекус" (16:30)
+    - Fallback: Current local date and time.
     """
-    if not text:
-        return None
-    
-    match = re.search(r'\b([0-1]?[0-9]|2[0-3])[:\.-]([0-5][0-9])\b', text)
-    if match:
-        hh = int(match.group(1))
-        mm = int(match.group(2))
-        return f"{hh:02d}:{mm:02d}:00"
-    
-    match_hour = re.search(r'\bв\s+([0-1]?[0-9]|2[0-3])\s+(часов|часа|ч)\b', text.lower())
-    if match_hour:
-        hh = int(match_hour.group(1))
-        return f"{hh:02d}:00:00"
-        
-    return None
+    try:
+        import zoneinfo
+        user_tz = zoneinfo.ZoneInfo("Europe/Tallinn")
+    except Exception:
+        user_tz = None
+
+    if not now_dt:
+        now_dt = datetime.now(user_tz) if user_tz else datetime.now()
+
+    text_lower = (text or "").lower()
+    target_date = now_dt.date()
+
+    # 1. Relative date keywords
+    if "позавчера" in text_lower:
+        target_date = now_dt.date() - timedelta(days=2)
+    elif "вчера" in text_lower:
+        target_date = now_dt.date() - timedelta(days=1)
+    elif "сегодня" in text_lower:
+        target_date = now_dt.date()
+
+    # 2. Check explicit day of month (e.g. '27 августа', '27-го', '27-го числа')
+    months_ru = {
+        "январ": 1, "феврал": 2, "март": 3, "апрел": 4, "ма": 5, "июн": 6,
+        "июл": 7, "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12
+    }
+    date_match = re.search(r'\b([0-3]?[0-9])[-й|го|е|\s]+([а-яё]+)', text_lower)
+    if date_match:
+        day_num = int(date_match.group(1))
+        month_word = date_match.group(2)
+        for m_prefix, m_num in months_ru.items():
+            if month_word.startswith(m_prefix):
+                try:
+                    target_date = target_date.replace(month=m_num, day=day_num)
+                except Exception:
+                    pass
+                break
+
+    # 3. Time resolution
+    time_str = None
+    if spoken_time and re.match(r'^\d{1,2}:\d{2}(:\d{2})?$', str(spoken_time).strip()):
+        st = str(spoken_time).strip()
+        time_str = st if len(st) == 8 else (f"0{st}:00" if len(st) == 4 else (f"{st}:00" if len(st) == 5 else st))
+    else:
+        time_match = re.search(r'\b([0-1]?[0-9]|2[0-3])[:\.-]([0-5][0-9])\b', text_lower)
+        if time_match:
+            hh = int(time_match.group(1))
+            mm = int(time_match.group(2))
+            time_str = f"{hh:02d}:{mm:02d}:00"
+        else:
+            hour_match = re.search(r'\bв\s+([0-1]?[0-9]|2[0-3])\s*(часов|часа|ч|утра|вечера|дня)?\b', text_lower)
+            if hour_match:
+                hh = int(hour_match.group(1))
+                if "вечер" in text_lower and hh < 12:
+                    hh += 12
+                time_str = f"{hh:02d}:00:00"
+
+    # Standard meal time presets if no explicit time
+    if not time_str:
+        mt_lower = (meal_type or "").lower()
+        if mt_lower == "breakfast" or any(k in text_lower for k in ["завтрак", "утром", "с утра"]):
+            time_str = "09:00:00"
+        elif mt_lower == "lunch" or any(k in text_lower for k in ["обед", "пообедал", "днём", "днем"]):
+            time_str = "14:00:00"
+        elif mt_lower == "dinner" or any(k in text_lower for k in ["ужин", "поужинал", "вечером"]):
+            time_str = "19:30:00"
+        elif mt_lower == "snack" or any(k in text_lower for k in ["перекус", "полдник"]):
+            time_str = "16:30:00"
+        else:
+            time_str = now_dt.strftime("%H:%M:%S")
+
+    return f"{target_date.strftime('%Y-%m-%d')} {time_str}"
+
 
 
 def match_custom_recipe(text):
@@ -118,10 +181,8 @@ def match_custom_recipe(text):
                     match_res["source"] = "LIBRARY"
                     match_res["is_custom_matched"] = True
                     
-                    # Extract spoken time if present
-                    spoken_time = parse_spoken_time_from_text(text)
-                    if spoken_time:
-                        match_res["spoken_time"] = spoken_time
+                    # Extract spoken timestamp if present
+                    match_res["timestamp"] = resolve_spoken_date_and_time(text, match_res.get("meal_type", ""))
 
                     print(f"🎯 [CUSTOM RECIPE MATCHED]: {match_res['meal_name']}", flush=True)
                     return match_res
@@ -153,22 +214,23 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         prompt = (
             "Послушай эту русскую голосовую аудиозапись:\n"
             "1. Дословно запиши весь текст в 'transcribed_text'.\n"
-            "2. Выдели все упомянутые продукты, блюда, ингредиенты и напитки (даже если пользователь говорит сложно: 'сегодня я на завтрак ел...', 'пообедал супом и котлетой', 'выпил кофе с молоком').\n"
-            "3. Сформируй понятное русское название блюда/приёма пищи в 'meal_name'.\n"
-            "4. Определи 'meal_type' (Breakfast, Lunch, Dinner, Snack).\n"
-            "5. Рассчитай суммарный вес 'estimated_weight_g', суммарные калории 'calories', макросы (белки, жиры, углеводы, клетчатка, сахар), аминокислоты и витамины.\n"
-            "6. Выведи результат СТРОГО в формате JSON SCHEMA 1 (FOOD_LOG)."
+            "2. Выдели все упомянутые продукты, блюда, ингредиенты и напитки (например: 'сегодня я на завтрак ел...', 'пообедал супом и котлетой', 'вчера в 14:30 съел творог').\n"
+            "3. Разложи составное блюдо на отдельные компоненты в массиве 'ingredients_breakdown' (например: ['Куриная грудка (150г) — 240 ккал (Б: 46г)', 'Рис отварной (150г) — 195 ккал']).\n"
+            "4. Сформируй понятное русское название приёма пищи в 'meal_name'.\n"
+            "5. Определи 'meal_type' (Breakfast, Lunch, Dinner, Snack).\n"
+            "6. Рассчитай суммарный вес 'estimated_weight_g', суммарные калории 'calories', макросы (белки, жиры, углеводы, клетчатка, сахар), аминокислоты и витамины.\n"
+            "7. Выведи результат СТРОГО в формате JSON SCHEMA 1 (FOOD_LOG)."
         )
 
     system_instruction = (
         "You are an expert Russian FoodTech Data Ingestion AI.\n"
         "FOR AUDIO VOICE NOTES: Transcribe spoken Russian audio text word-for-word into 'transcribed_text'.\n\n"
         "RULES FOR PARSING FOOD, DRINKS & MEALS (INCLUDING COMPLEX CONVERSATIONAL SENTENCES):\n"
-        "1. If the user mentions ANY food, meal, beverage, or recipe (simple like 'творог', or conversational like 'сегодня я на завтрак ел яичницу с тостом и кофе', 'пообедал борщом в 14:00'):\n"
+        "1. If the user mentions ANY food, meal, beverage, or recipe (simple like 'творог', or conversational like 'сегодня я на завтрак ел яичницу с тостом и кофе', 'вчера пообедал борщом в 14:00', '27 августа утром ел кашу'):\n"
         "   - ALWAYS set \"intent\": \"FOOD_LOG\".\n"
         "   - Synthesize a concise, clear Russian title in 'meal_name' (e.g. 'Яичница с тостом и кофе', 'Борщ с хлебом', 'Овсяная каша с ягодами').\n"
+        "   - Break down composite meals into individual ingredients with estimated weight and calories in 'ingredients_breakdown' (e.g. ['Яичница из 2 яиц (120г) — 180 ккал', 'Тост цельнозерновой (40г) — 100 ккал', 'Кофе черный без сахара (200мл) — 2 ккал']).\n"
         "   - Extract 'meal_type' ('Breakfast' if завтрак/утро, 'Lunch' if обед/день, 'Dinner' if ужин/вечер, 'Snack' if перекус).\n"
-        "   - If explicit time is spoken (e.g., 'в 9 утра', 'в 14:30', '13:00'), extract to 'spoken_time' (format 'HH:MM:SS').\n"
         "   - Calculate total estimated weight in grams ('estimated_weight_g') for all components combined.\n"
         "   - Accurately calculate total combined calories, macros (protein, fat, carbs, fiber, sugar), 4 amino acids (lysine, leucine, tryptophan, methionine), and key vitamins/minerals.\n"
         "2. DO NOT write conversational text, markdown chatter, or advice. Output ONLY raw JSON.\n\n"
@@ -178,7 +240,10 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         '  "transcribed_text": "Word-for-word speech transcription",\n'
         '  "meal_name": "Synthesized Russian Food/Meal Title",\n'
         '  "meal_type": "Breakfast | Lunch | Snack | Dinner",\n'
-        '  "spoken_time": "HH:MM:SS or null",\n'
+        '  "ingredients_breakdown": [\n'
+        '    "Ингредиент 1 (вес) — Ккал (Б/Ж/У)",\n'
+        '    "Ингредиент 2 (вес) — Ккал (Б/Ж/У)"\n'
+        '  ],\n'
         '  "estimated_weight_g": 300,\n'
         '  "calories": 350,\n'
         '  "protein_g": 22.0,\n'
@@ -196,8 +261,6 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         '  "transcribed_text": "Word-for-word speech transcription"\n'
         "}"
     )
-
-
 
     parts = [{"text": f"{system_instruction}\n\nUser Input: {prompt}"}]
 
@@ -217,14 +280,12 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
         "contents": [{"parts": parts}],
         "generationConfig": {
             "temperature": 0.1,
-            "maxOutputTokens": 400
+            "maxOutputTokens": 600
         }
     }
     
     # Primary: High-intelligence & ultra-cheap Gemini 2.5 Flash ($0.0001/req) -> Fallback: Flash-Lite
     candidate_models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
-
-
 
     for m in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
@@ -243,12 +304,6 @@ def parse_raw_food_input(text_input, image_path=None, audio_path=None):
                         json_match = re.search(r"\{.*\}", text_resp, re.DOTALL)
                         if json_match:
                             parsed = json.loads(json_match.group(0))
-                            
-                            # Extract spoken time if present in transcription
-                            transcribed = parsed.get("transcribed_text", "")
-                            spoken_t = parse_spoken_time_from_text(transcribed) or parsed.get("spoken_time")
-                            if spoken_t:
-                                parsed["spoken_time"] = spoken_t
                             return parsed
             else:
                 print(f"⚠️ [GEMINI API ERROR] Model {m} returned HTTP {r.status_code}: {r.text[:200]}", flush=True)
@@ -264,9 +319,8 @@ def commit_raw_meal(meal_data, source="APP"):
     Save meal entry into food_diary.json & food_diary.csv under Strict Write Authorization Rule.
     Authorized sources: 'LIBRARY' (my_custom_recipes.json), 'ANALYTICS_ENGINE' (Tier 2), 'APP' (App UI / Bot), 'TELEGRAM'.
     
-    TIMESTAMP RULE:
-    If meal_data contains explicit spoken_time (e.g., "14:30:00"), combines today's date + spoken time.
-    Otherwise, sets exact timestamp of when the message was received/recorded.
+    TIMESTAMP & DATE RULE:
+    Resolves natural language dates ('вчера', 'сегодня', '27 августа') and spoken times ('в 14:30', 'на завтрак').
     """
     authorized_sources = ["LIBRARY", "ANALYTICS_ENGINE", "APP", "TELEGRAM"]
     is_custom_matched = meal_data.get("source") == "LIBRARY" or meal_data.get("is_custom_matched") is True
@@ -276,42 +330,13 @@ def commit_raw_meal(meal_data, source="APP"):
         print(f"⚠️ [WRITE REJECTED]: Unverified write source '{actual_source}'. Entries must originate from LIBRARY, ANALYTICS_ENGINE, APP or TELEGRAM.", flush=True)
         return None
 
-    # Resolve Timestamp with User Local Timezone (Europe/Tallinn / UTC+3)
-    try:
-        import zoneinfo
-        user_tz = zoneinfo.ZoneInfo("Europe/Tallinn")
-        now_dt = datetime.now(user_tz)
-    except Exception:
-        now_dt = datetime.now()
-
-    now_date_str = now_dt.strftime("%Y-%m-%d")
-    now_full_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
-
+    # Resolve Timestamp with natural language date & time parser
     resolved_timestamp = meal_data.get("timestamp")
     if not resolved_timestamp:
-        spoken_time = meal_data.get("spoken_time")
-        meal_type = (meal_data.get("meal_type") or "").lower()
-        transcribed_lower = (meal_data.get("transcribed_text") or "").lower()
-
-        # 1. Explicit spoken time (e.g. "14:30", "09:00")
-        if spoken_time and re.match(r'^\d{2}:\d{2}(:\d{2})?$', spoken_time):
-            time_part = spoken_time if len(spoken_time) == 8 else f"{spoken_time}:00"
-            resolved_timestamp = f"{now_date_str} {time_part}"
-        
-        # 2. Standard Meal Time presets if meal period was specified without explicit time
-        elif meal_type == "breakfast" or any(kw in transcribed_lower for kw in ["завтрак", "утром", "с утра"]):
-            resolved_timestamp = f"{now_date_str} 09:00:00"
-        elif meal_type == "lunch" or any(kw in transcribed_lower for kw in ["обед", "пообедал", "днём"]):
-            resolved_timestamp = f"{now_date_str} 14:00:00"
-        elif meal_type == "dinner" or any(kw in transcribed_lower for kw in ["ужин", "поужинал", "вечером"]):
-            resolved_timestamp = f"{now_date_str} 19:30:00"
-        elif meal_type == "snack" or any(kw in transcribed_lower for kw in ["перекус", "полдник"]):
-            resolved_timestamp = f"{now_date_str} 16:30:00"
-        
-        # 3. Fallback: Exact recording timestamp of the message
-        else:
-            resolved_timestamp = now_full_str
-
+        transcribed_txt = meal_data.get("transcribed_text") or meal_data.get("meal_name") or ""
+        meal_type = meal_data.get("meal_type") or ""
+        spoken_t = meal_data.get("spoken_time")
+        resolved_timestamp = resolve_spoken_date_and_time(transcribed_txt, meal_type, spoken_time=spoken_t)
 
     diary = {"entries": []}
     if os.path.exists(DIARY_FILE):
@@ -326,9 +351,9 @@ def commit_raw_meal(meal_data, source="APP"):
         "id": m_id,
         "meal_id": m_id,
         "timestamp": resolved_timestamp,
-
         "meal_name": meal_data.get("meal_name", "Приём пищи"),
         "meal_type": meal_data.get("meal_type", "Meal"),
+        "ingredients_breakdown": meal_data.get("ingredients_breakdown", []),
         "estimated_weight_g": meal_data.get("estimated_weight_g", 250),
         "calories": meal_data.get("calories", 0),
         "protein_g": meal_data.get("protein_g", 0),
@@ -342,6 +367,7 @@ def commit_raw_meal(meal_data, source="APP"):
         "vitamins_minerals": meal_data.get("vitamins_minerals", {}),
         "omega_3_6": meal_data.get("omega_3_6", {})
     }
+
 
     diary.setdefault("entries", []).append(meal_entry)
     with open(DIARY_FILE, "w", encoding="utf-8") as f:
